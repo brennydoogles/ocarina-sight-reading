@@ -97,6 +97,30 @@ describe('naming', () => {
     expect(toVexKey(89)).toBe('f/6');
   });
 
+  it('defaults to sharps for both naming functions', () => {
+    expect(noteName(70)).toBe('A#4');
+    expect(toVexKey(70)).toBe('a#/4');
+  });
+
+  it('spells flats on request, without disturbing the sharp default', () => {
+    expect(noteName(70, { flats: true })).toBe('Bb4');
+    expect(toVexKey(70, { flats: true })).toBe('bb/4');
+    expect(noteName(75, { flats: true })).toBe('Eb5');
+    expect(toVexKey(75, { flats: true })).toBe('eb/5');
+    // Naturals are spelled the same either way.
+    expect(noteName(72, { flats: true })).toBe('C5');
+    expect(toVexKey(72, { flats: true })).toBe('c/5');
+    // Still defaults to sharps when the option is omitted.
+    expect(noteName(70)).toBe('A#4');
+    expect(toVexKey(70)).toBe('a#/4');
+  });
+
+  it('round-trips a flat spelling back to the same MIDI number', () => {
+    for (let m = 69; m <= 89; m += 1) {
+      expect(midiFromName(noteName(m, { flats: true }))).toBe(m);
+    }
+  });
+
   it('identifies naturals', () => {
     expect([69, 71, 72, 74, 76, 77].every(isNatural)).toBe(true);
     expect([70, 73, 75, 78, 80].some(isNatural)).toBe(false);

@@ -12,11 +12,17 @@ export const A4_HZ = 440;
 export const A4_MIDI = 69;
 
 /**
- * Sharps throughout. The app drills naturals only, but the detector still has
- * to name whatever it hears -- telling the player they are sounding a C#5
- * against a C5 target is the useful half of the feedback.
+ * Sharps throughout by default. The app drills naturals only, but the
+ * detector still has to name whatever it hears -- telling the player they
+ * are sounding a C#5 against a C5 target is the useful half of the feedback.
  */
 const NAMES_SHARP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+/**
+ * Flat spellings of the same pitch classes, for sources that spell their own
+ * way -- ABC tunes routinely write `_B` for B flat rather than A#.
+ */
+const NAMES_FLAT = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 
 /**
  * Exact frequency of a MIDI note. Accepts fractional values, so
@@ -102,21 +108,27 @@ export function isNatural(midi) {
 }
 
 /**
- * Human-readable name, e.g. 69 -> "A4", 70 -> "A#4".
+ * Human-readable name, e.g. 69 -> "A4", 70 -> "A#4" (or "Bb4" with
+ * `flats: true`).
  * @param {number} midi
+ * @param {{ flats?: boolean }} [options]
  * @returns {string}
  */
-export function noteName(midi) {
-  return `${NAMES_SHARP[pitchClass(midi)]}${octaveOf(midi)}`;
+export function noteName(midi, { flats = false } = {}) {
+  const names = flats ? NAMES_FLAT : NAMES_SHARP;
+  return `${names[pitchClass(midi)]}${octaveOf(midi)}`;
 }
 
 /**
- * VexFlow's key format: lowercase letter, slash, octave.
+ * VexFlow's key format: lowercase letter, slash, octave, e.g. "a/4", "c/5".
+ * A flat name produces a key like "bb/4" rather than "a#/4".
  * @param {number} midi
- * @returns {string} e.g. "a/4", "c/5"
+ * @param {{ flats?: boolean }} [options]
+ * @returns {string}
  */
-export function toVexKey(midi) {
-  return `${NAMES_SHARP[pitchClass(midi)].toLowerCase()}/${octaveOf(midi)}`;
+export function toVexKey(midi, { flats = false } = {}) {
+  const names = flats ? NAMES_FLAT : NAMES_SHARP;
+  return `${names[pitchClass(midi)].toLowerCase()}/${octaveOf(midi)}`;
 }
 
 /**

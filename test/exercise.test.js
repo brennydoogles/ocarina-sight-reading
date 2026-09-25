@@ -28,6 +28,14 @@ describe('notePool', () => {
   it('is empty for an inverted range', () => {
     expect(notePool({ low: 80, high: 70 })).toEqual([]);
   });
+
+  it('includes accidentals only when asked', () => {
+    const chromatic = notePool({
+      low: INSTRUMENT_LOW, high: INSTRUMENT_HIGH, includeAccidentals: true,
+    });
+    expect(chromatic).toHaveLength(21);
+    expect(chromatic.some((m) => !isNatural(m))).toBe(true);
+  });
 });
 
 describe('generateExercise', () => {
@@ -86,6 +94,30 @@ describe('generateExercise', () => {
     let previous = [];
     for (let i = 0; i < 500 && seen.size < pool.length; i += 1) {
       const ex = generateExercise({ ...DEFAULTS, previous });
+      seen.add(ex[0].midi);
+      previous = ex.map((n) => n.midi);
+    }
+    expect([...seen].sort((x, y) => x - y)).toEqual(pool);
+  });
+
+  it('draws from the chromatic pool without repeating consecutively', () => {
+    const range = { low: INSTRUMENT_LOW, high: INSTRUMENT_HIGH, includeAccidentals: true };
+    let previous = [];
+    for (let i = 0; i < 300; i += 1) {
+      const ex = generateExercise({ ...range, previous });
+      expect(ex[0].midi).not.toBe(previous[0]);
+      previous = ex.map((n) => n.midi);
+    }
+  });
+
+  it('eventually covers the whole chromatic pool, accidentals included', () => {
+    const range = { low: INSTRUMENT_LOW, high: INSTRUMENT_HIGH, includeAccidentals: true };
+    const pool = notePool(range);
+    expect(pool).toHaveLength(21);
+    const seen = new Set();
+    let previous = [];
+    for (let i = 0; i < 1000 && seen.size < pool.length; i += 1) {
+      const ex = generateExercise({ ...range, previous });
       seen.add(ex[0].midi);
       previous = ex.map((n) => n.midi);
     }
