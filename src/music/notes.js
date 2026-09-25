@@ -22,17 +22,21 @@ export const DETECTABLE_MIN_HZ = midiToHz(INSTRUMENT_LOW - 1);
 export const DETECTABLE_MAX_HZ = midiToHz(INSTRUMENT_HIGH + 1);
 
 /**
- * Every note this app drills: the naturals from A4 to F6.
+ * Every note this app drills: the naturals from A4 to F6 by default.
  *
  * The instrument itself is fully chromatic across that span, and the detector
- * still recognises accidentals so that playing one reads as a wrong note
- * rather than as noise -- see DETECTABLE_MIN_HZ above. They are simply not
- * part of the exercise pool or the fingering data.
+ * always recognises accidentals so that playing one reads as a wrong note
+ * rather than as noise -- see DETECTABLE_MIN_HZ above. `includeAccidentals`
+ * only controls whether they show up here, in the exercise pool and the
+ * fingering data.
  *
- * @returns {number[]} thirteen MIDI numbers, ascending
+ * @param {{ includeAccidentals?: boolean }} [options]
+ * @returns {number[]} MIDI numbers, ascending -- thirteen by default, 21 with
+ *   `includeAccidentals: true`
  */
-export function allInstrumentNotes() {
-  return rangeInclusive(INSTRUMENT_LOW, INSTRUMENT_HIGH).filter(isNatural);
+export function allInstrumentNotes({ includeAccidentals = false } = {}) {
+  const notes = rangeInclusive(INSTRUMENT_LOW, INSTRUMENT_HIGH);
+  return includeAccidentals ? notes : notes.filter(isNatural);
 }
 
 /**
@@ -48,14 +52,15 @@ export function rangeInclusive(low, high) {
 
 /**
  * The pool an exercise generator draws from: the practice range, clamped to
- * what the instrument can play and restricted to naturals.
- * @param {{ low: number, high: number }} options
+ * what the instrument can play and, by default, restricted to naturals.
+ * @param {{ low: number, high: number, includeAccidentals?: boolean }} options
  * @returns {number[]} MIDI numbers, ascending
  */
-export function notePool({ low, high }) {
+export function notePool({ low, high, includeAccidentals = false }) {
   const lo = Math.max(low, INSTRUMENT_LOW);
   const hi = Math.min(high, INSTRUMENT_HIGH);
-  return rangeInclusive(lo, hi).filter(isNatural);
+  const notes = rangeInclusive(lo, hi);
+  return includeAccidentals ? notes : notes.filter(isNatural);
 }
 
 /**

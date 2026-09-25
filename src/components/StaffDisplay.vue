@@ -4,7 +4,7 @@ import { ref, shallowRef, watch, onMounted } from 'vue';
 // The default `vexflow` entry pulls six fonts from jsDelivr at runtime, which
 // would leave the installed PWA unable to draw a staff offline.
 import VexFlow from 'vexflow/bravura';
-import { toVexKey, noteName } from '../music/pitch.js';
+import { toVexKey, noteName, isNatural } from '../music/pitch.js';
 
 const props = defineProps({
   midi: { type: Number, required: true },
@@ -13,7 +13,7 @@ const props = defineProps({
   showName: { type: Boolean, default: false },
 });
 
-const { Renderer, Stave, StaveNote, Voice, Formatter } = VexFlow;
+const { Renderer, Stave, StaveNote, Voice, Formatter, Accidental } = VexFlow;
 
 const host = ref(null);
 const fontsReady = shallowRef(false);
@@ -59,6 +59,9 @@ function draw() {
     duration: 'w',
     clef: 'treble',
   });
+  // VexFlow doesn't infer an accidental from the key string ("a#/4") -- a
+  // sharp silently renders as a natural unless a modifier is attached.
+  if (!isNatural(props.midi)) note.addModifier(new Accidental('#'), 0);
   const colour = {
     correct: getVar('--note-correct', '#3fb950'),
     wrong: getVar('--note-wrong', '#d98a3a'),
@@ -77,7 +80,10 @@ function draw() {
     svg.removeAttribute('width');
     svg.removeAttribute('height');
     svg.setAttribute('role', 'img');
-    svg.setAttribute('aria-label', `${noteName(props.midi)} on the treble clef`);
+    // noteName() already renders the "#", but screen readers don't reliably
+    // announce that glyph, so spell it out too.
+    const spoken = isNatural(props.midi) ? noteName(props.midi) : `${noteName(props.midi)} (sharp)`;
+    svg.setAttribute('aria-label', `${spoken} on the treble clef`);
   }
 }
 

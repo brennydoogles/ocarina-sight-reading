@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   FINGERINGS, HOLE_IDS, HOLE_META, HOLE_STATE, getFingering,
 } from '../src/music/fingerings.js';
-import { INSTRUMENT_LOW, INSTRUMENT_HIGH, allInstrumentNotes } from '../src/music/notes.js';
+import {
+  INSTRUMENT_LOW, INSTRUMENT_HIGH, allInstrumentNotes, rangeInclusive,
+} from '../src/music/notes.js';
 import { noteName, isNatural } from '../src/music/pitch.js';
 
 const VALID_STATES = Object.values(HOLE_STATE);
@@ -13,16 +15,16 @@ const VALID_STATES = Object.values(HOLE_STATE);
  * render a diagram that teaches the wrong fingering.
  */
 describe('fingering table integrity', () => {
-  it('covers every note the app drills, and nothing outside it', () => {
+  it('covers the full chromatic range, naturals and accidentals alike', () => {
     const keys = Object.keys(FINGERINGS).map(Number).sort((a, b) => a - b);
-    expect(keys).toEqual(allInstrumentNotes());
-    expect(keys[0]).toBe(INSTRUMENT_LOW);
-    expect(keys[keys.length - 1]).toBe(INSTRUMENT_HIGH);
-    expect(keys).toHaveLength(13);
+    expect(keys).toEqual(rangeInclusive(INSTRUMENT_LOW, INSTRUMENT_HIGH));
+    expect(keys).toHaveLength(21);
   });
 
-  it('holds naturals only', () => {
-    expect(Object.keys(FINGERINGS).map(Number).every(isNatural)).toBe(true);
+  it('has thirteen natural rows and eight accidental rows', () => {
+    const keys = Object.keys(FINGERINGS).map(Number);
+    expect(keys.filter(isNatural)).toHaveLength(13);
+    expect(keys.filter((m) => !isNatural(m))).toHaveLength(8);
   });
 
   it('gives every note exactly the twelve known holes', () => {
@@ -82,9 +84,15 @@ describe('fingering table musical sanity', () => {
     expect(main.every((id) => c5[id] === HOLE_STATE.CLOSED)).toBe(true);
   });
 
-  it('never opens more holes as the pitch rises', () => {
-    // Covering less air raises the pitch, so closed-hole count must be
-    // monotonically non-increasing up the scale.
+  it('never opens more holes as the pitch rises, among the naturals', () => {
+    // True of the naturals only -- deliberately NOT extended to all 21 rows.
+    // The five highest accidentals are "forked" fingerings: the natural
+    // above with R3 closed, e.g. F5 has R3 open but F#5 has it closed, and
+    // C5/C#5 open the same *number* of holes. Covering less air raises the
+    // pitch only within a fixed fingering family, not across the fork, so
+    // monotonicity holds for the naturals' own scale but not once
+    // accidentals are mixed in. Do not "fix" the data to make this pass
+    // over allInstrumentNotes({ includeAccidentals: true }).
     const notes = allInstrumentNotes();
     for (let i = 1; i < notes.length; i += 1) {
       expect(
@@ -94,26 +102,34 @@ describe('fingering table musical sanity', () => {
     }
   });
 
-  it('gives every note a distinct fingering', () => {
+  it('gives every one of the 21 notes a distinct fingering', () => {
     const seen = new Map();
-    for (const m of allInstrumentNotes()) {
+    for (const m of Object.keys(FINGERINGS).map(Number)) {
       const key = HOLE_IDS.map((id) => FINGERINGS[m][id]).join('');
       expect(seen.has(key), `${noteName(m)} duplicates ${noteName(seen.get(key))}`).toBe(false);
       seen.set(key, m);
     }
   });
+
+  it('opens SubR (not SubL) for A#4, unlike B4 which opens SubL', () => {
+    // The easiest row to typo: the two subholes are not interchangeable.
+    expect(FINGERINGS[70].SubL).toBe(HOLE_STATE.CLOSED);
+    expect(FINGERINGS[70].SubR).toBe(HOLE_STATE.OPEN);
+    expect(FINGERINGS[71].SubL).toBe(HOLE_STATE.OPEN);
+    expect(FINGERINGS[71].SubR).toBe(HOLE_STATE.CLOSED);
+  });
 });
 
 describe('accessors', () => {
-  it('returns a fingering for the notes it drills and null otherwise', () => {
+  it('returns a fingering within the instrument range and null outside it', () => {
     expect(getFingering(69)).toBeTruthy();
     expect(getFingering(89)).toBeTruthy();
     expect(getFingering(68)).toBeNull();
     expect(getFingering(90)).toBeNull();
   });
 
-  it('returns null for an accidental, which is out of scope', () => {
-    expect(getFingering(70)).toBeNull(); // A#4
-    expect(getFingering(75)).toBeNull(); // D#5
+  it('returns a fingering for accidentals too, now that the chart is chromatic', () => {
+    expect(getFingering(70)).toBeTruthy(); // A#4
+    expect(getFingering(75)).toBeTruthy(); // D#5
   });
 });

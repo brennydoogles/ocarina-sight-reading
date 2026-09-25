@@ -1,19 +1,30 @@
 /**
  * Fingerings for the 12-hole Alto C ocarina (Asian linear system).
  *
- * NATURALS ONLY. The instrument plays a full chromatic A4-F6, but this app
- * drills the thirteen naturals, so only those are carried here. The
- * accidentals are mechanically re-derivable from the two sources named below
- * if chromatic practice is ever wanted.
+ * Fully chromatic, A4-F6: thirteen naturals plus eight accidentals, 21 rows
+ * in total.
  *
  * SOURCING -- this is the one dataset here that describes a physical object
  * rather than arithmetic, so it was cross-checked rather than hand-entered.
- * Two independent open-source fingering tables were compared hole-by-hole:
- * tribbin/Ocarina-Practice (instruments/oot-alto-c-12) and
- * smilack/ocarina-chart. Their hole orderings differ, so the mapping between
- * them was solved from the column signatures across all 21 chromatic notes,
- * then every note compared. The two agree on every one of the thirteen
- * naturals below.
+ *
+ * The thirteen naturals: two independent open-source fingering tables were
+ * compared hole-by-hole, tribbin/Ocarina-Practice (instruments/oot-alto-c-12)
+ * and smilack/ocarina-chart. Their hole orderings differ, so the mapping
+ * between them was solved from the column signatures across all 21 chromatic
+ * notes, then every note compared. The two agree on every one of the
+ * thirteen naturals below.
+ *
+ * The eight accidentals: read from STL Ocarina's "A Complete Fingering Chart
+ * for 12 Hole Tenor and Soprano Ocarinas" (c 2008 STL Ocarina),
+ * https://cdn.shopify.com/s/files/1/0103/7756/0119/files/12tenorC.pdf?6821.
+ * Two things from that chart worth recording because they are surprising:
+ *   - STL calls this instrument "Tenor C" and writes the chart an octave
+ *     below sounding pitch ("If you have a tenor ocarina, the actual pitch
+ *     is one octave above the notes written here"). Sounding range A4-F6 --
+ *     the same instrument this app calls Alto C.
+ *   - The chart uses no half-holing. Every hole is fully open or fully
+ *     closed. HOLE_STATE.HALF remains defined but unused; do not introduce
+ *     it on the strength of this chart.
  *
  * Still worth a sanity check against the chart that came with the instrument,
  * since makers vary; the FingeringReference screen exists for exactly that.
@@ -69,7 +80,8 @@ export const HOLE_META = Object.freeze({
  */
 
 /**
- * Fingering per MIDI note, for the thirteen naturals from A4 (69) to F6 (89).
+ * Fingering per MIDI note, for the full chromatic range from A4 (69) to
+ * F6 (89): thirteen naturals plus eight accidentals, 21 rows.
  * @type {Record<number, Fingering>}
  */
 export const FINGERINGS = Object.freeze({
@@ -77,6 +89,11 @@ export const FINGERINGS = Object.freeze({
   69: {
     LT: C, RT: C, L1: C, L2: C, L3: C, L4: C,
     R1: C, R2: C, R3: C, R4: C, SubL: C, SubR: C
+  },
+  // A#4  (MIDI 70)
+  70: {
+    LT: C, RT: C, L1: C, L2: C, L3: C, L4: C,
+    R1: C, R2: C, R3: C, R4: C, SubL: C, SubR: O
   },
   // B4   (MIDI 71)
   71: {
@@ -88,10 +105,20 @@ export const FINGERINGS = Object.freeze({
     LT: C, RT: C, L1: C, L2: C, L3: C, L4: C,
     R1: C, R2: C, R3: C, R4: C, SubL: O, SubR: O
   },
+  // C#5  (MIDI 73)
+  73: {
+    LT: C, RT: C, L1: C, L2: C, L3: C, L4: C,
+    R1: C, R2: C, R3: C, R4: O, SubL: O, SubR: C
+  },
   // D5   (MIDI 74)
   74: {
     LT: C, RT: C, L1: C, L2: C, L3: C, L4: C,
     R1: C, R2: C, R3: C, R4: O, SubL: O, SubR: O
+  },
+  // D#5  (MIDI 75)
+  75: {
+    LT: C, RT: C, L1: C, L2: C, L3: C, L4: C,
+    R1: C, R2: C, R3: O, R4: O, SubL: O, SubR: C
   },
   // E5   (MIDI 76)
   76: {
@@ -103,15 +130,30 @@ export const FINGERINGS = Object.freeze({
     LT: C, RT: C, L1: C, L2: C, L3: C, L4: C,
     R1: C, R2: O, R3: O, R4: O, SubL: O, SubR: O
   },
+  // F#5  (MIDI 78)
+  78: {
+    LT: C, RT: C, L1: C, L2: C, L3: C, L4: C,
+    R1: O, R2: O, R3: C, R4: O, SubL: O, SubR: O
+  },
   // G5   (MIDI 79)
   79: {
     LT: C, RT: C, L1: C, L2: C, L3: C, L4: C,
     R1: O, R2: O, R3: O, R4: O, SubL: O, SubR: O
   },
+  // G#5  (MIDI 80)
+  80: {
+    LT: C, RT: C, L1: C, L2: C, L3: O, L4: C,
+    R1: O, R2: O, R3: C, R4: O, SubL: O, SubR: C
+  },
   // A5   (MIDI 81)
   81: {
     LT: C, RT: C, L1: C, L2: C, L3: O, L4: C,
     R1: O, R2: O, R3: O, R4: O, SubL: O, SubR: O
+  },
+  // A#5  (MIDI 82)
+  82: {
+    LT: C, RT: C, L1: C, L2: O, L3: O, L4: C,
+    R1: O, R2: O, R3: C, R4: O, SubL: O, SubR: O
   },
   // B5   (MIDI 83)
   83: {
@@ -123,10 +165,20 @@ export const FINGERINGS = Object.freeze({
     LT: C, RT: C, L1: O, L2: O, L3: O, L4: C,
     R1: O, R2: O, R3: O, R4: O, SubL: O, SubR: O
   },
+  // C#6  (MIDI 85)
+  85: {
+    LT: O, RT: C, L1: O, L2: O, L3: O, L4: C,
+    R1: O, R2: O, R3: C, R4: O, SubL: O, SubR: O
+  },
   // D6   (MIDI 86)
   86: {
     LT: O, RT: C, L1: O, L2: O, L3: O, L4: C,
     R1: O, R2: O, R3: O, R4: O, SubL: O, SubR: O
+  },
+  // D#6  (MIDI 87)
+  87: {
+    LT: O, RT: O, L1: O, L2: O, L3: O, L4: C,
+    R1: O, R2: O, R3: C, R4: O, SubL: O, SubR: O
   },
   // E6   (MIDI 88)
   88: {
@@ -142,8 +194,8 @@ export const FINGERINGS = Object.freeze({
 
 /**
  * @param {number} midi
- * @returns {Fingering|null} the fingering, or null for any note this app does
- *   not drill -- including the accidentals.
+ * @returns {Fingering|null} the fingering, or null outside the instrument's
+ *   A4-F6 range.
  */
 export function getFingering(midi) {
   return FINGERINGS[midi] ?? null;

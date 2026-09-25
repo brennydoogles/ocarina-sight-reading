@@ -19,6 +19,7 @@ import { makeNote, notePool } from './notes.js';
  * @param {number} [options.length] notes in the exercise; 1 in v1
  * @param {number[]} [options.previous] MIDI numbers of the last exercise
  * @param {() => number} [options.random] injectable for deterministic tests
+ * @param {boolean} [options.includeAccidentals] draw from the chromatic pool
  * @returns {import('./notes.js').Note[]}
  */
 export function generateExercise({
@@ -27,8 +28,9 @@ export function generateExercise({
   length = 1,
   previous = [],
   random = Math.random,
+  includeAccidentals = false,
 }) {
-  const pool = notePool({ low, high });
+  const pool = notePool({ low, high, includeAccidentals });
   if (pool.length === 0) return [];
 
   const lastMidi = previous.length > 0 ? previous[previous.length - 1] : null;
