@@ -1,134 +1,90 @@
 #!/usr/bin/env node
 /**
- * Renders one SVG per note into public/fingerings/, from the hole-state table
- * in src/music/fingerings.js.
+ * Derives the 21 fingering diagrams from `base.svg`, the hand-drawn artwork
+ * all of them share, using the hole-state table in src/music/fingerings.js.
+ *
+ * `base.svg` is a 1920x1080 Inkscape file whose twelve holes are <ellipse>
+ * elements, each carrying an id (HOLE_META[*].elementId, e.g. "leftPointer")
+ * and drawn open (`fill:#ffffff`). For each note, this script copies that
+ * file and, for each of the twelve holes, flips just the `fill:` token in
+ * that element's `style` attribute to `#000000` when the table says CLOSED.
+ * Nothing else in the file -- geometry, stroke, the Ocarina Body path, the
+ * Triforce decoration -- is touched, so a generated file is visually
+ * identical to the hand-drawn naturals it sits alongside.
  *
  * These files are meant to be redrawn by hand afterwards, so by default this
  * script WILL NOT overwrite a file that already exists -- running it again is
  * safe and only fills in what is missing. Pass --force to regenerate
- * everything, discarding hand edits.
+ * everything, discarding hand edits. Do not run --force and commit the
+ * result for the 13 hand-drawn naturals -- they are the source of truth this
+ * script derives from, not something it should regenerate over.
  *
  *   node scripts/render-fingerings.mjs            fill in missing files
  *   node scripts/render-fingerings.mjs --force    regenerate all
  *   node scripts/render-fingerings.mjs --check    verify, write nothing
  */
-import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { FINGERINGS, HOLE_META, HOLE_STATE } from '../src/music/fingerings.js';
+import { FINGERINGS, HOLE_IDS, HOLE_META, HOLE_STATE } from '../src/music/fingerings.js';
 import { allInstrumentNotes } from '../src/music/notes.js';
 import { noteName } from '../src/music/pitch.js';
 import { fingeringFileStem, FINGERING_DIR } from '../src/music/fingeringFiles.js';
 
 const OUT_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', FINGERING_DIR);
+const BASE_SVG_PATH = join(OUT_DIR, 'base.svg');
+
+/** HOLE_META[*].elementId -> the HOLE_IDS key it belongs to. */
+const HOLE_BY_ELEMENT_ID = new Map(HOLE_IDS.map((id) => [HOLE_META[id].elementId, id]));
+
+/** Self-closing shape elements, which is how Inkscape writes these holes. */
+const ELEMENT = /<(ellipse|circle|path|rect)\b[^>]*\/>/g;
 
 /**
- * Geometry. Both views live in one file so a single SVG is a complete
- * fingering. The arrangement follows the real instrument -- both hands run
- * index-to-pinky left-to-right, and each subhole sits under its middle-finger
- * hole because the same finger covers both -- with the spacing regularised so
- * the diagram reads at a glance on a phone.
+ * Flip the `fill:` token inside a style attribute, leaving everything else
+ * in it -- fill-opacity, stroke, stroke-width -- untouched.
+ * @param {string} elementText
+ * @param {string} hex e.g. "#000000"
+ * @returns {string}
  */
-const VIEW_BOX = { width: 512, height: 170 };
-const BACK_OFFSET_X = 344;
-
-const FRONT_BODY =
-  'M 24 76 C 24 40 58 22 152 22 C 246 22 290 36 294 60 L 308 56 L 308 78 '
-  + 'L 294 84 C 290 110 246 128 152 128 C 58 128 24 112 24 76 Z';
-const BACK_BODY =
-  'M 14 75 C 14 111 34 128 84 128 C 134 128 154 114 156 90 L 162 94 L 162 72 '
-  + 'L 156 66 C 154 40 134 22 84 22 C 34 22 14 39 14 75 Z';
-
-const FRONT_HOLES = {
-  L1: [52, 66], L2: [82, 56], L3: [112, 56], L4: [142, 66], SubL: [82, 84],
-  R1: [186, 66], R2: [216, 56], R3: [246, 56], R4: [274, 66], SubR: [216, 84],
-};
-const BACK_HOLES = { LT: [62, 75], RT: [106, 75] };
-
-const RADIUS = { normal: 13, small: 7.5 };
-
-const STYLES = `
-    /* These custom properties are supplied by the app when the file is
-       inlined, so the diagram follows the light/dark theme. The fallbacks
-       after each comma are what you see opening this file on its own. */
-    .body   { fill: var(--surface, #faf9f7); stroke: var(--ink-faint, #8a8f9a);
-              stroke-width: 2.5; stroke-linejoin: round; }
-    .hole   { stroke: var(--ink, #1b1d23); stroke-width: 2; }
-    .open   { fill: var(--surface, #faf9f7); }
-    .closed { fill: var(--ink, #1b1d23); }
-    .half   { fill: var(--surface, #faf9f7); }
-    .half-fill { fill: var(--ink, #1b1d23); }
-    .caption { fill: var(--ink-dim, #565b66); font: 500 12px ui-sans-serif, system-ui, sans-serif;
-               text-anchor: middle; }`;
-
-function holeMarkup(id, [cx, cy], state, indent) {
-  const r = HOLE_META[id].small ? RADIUS.small : RADIUS.normal;
-  const pad = ' '.repeat(indent);
-  const lines = [
-    `${pad}<!-- ${HOLE_META[id].label} -->`,
-    `${pad}<circle id="hole-${id}" class="hole ${state}" cx="${cx}" cy="${cy}" r="${r}"/>`,
-  ];
-  if (state === HOLE_STATE.HALF) {
-    // Lower half filled, drawn over the open circle.
-    lines.push(`${pad}<path class="half-fill" d="M ${cx - r} ${cy} a ${r} ${r} 0 0 0 ${r * 2} 0 Z"/>`);
+function setFill(elementText, hex) {
+  if (!/style="[^"]*fill:#[0-9a-fA-F]{6}/.test(elementText)) {
+    throw new Error(`No fill: token found to replace in element: ${elementText.slice(0, 120)}`);
   }
-  return lines.join('\n');
+  return elementText.replace(/(style="[^"]*?fill:)#[0-9a-fA-F]{6}/, `$1${hex}`);
 }
 
-function render(midi) {
+/**
+ * @param {number} midi
+ * @param {string} baseSvg contents of base.svg
+ * @returns {string} the note's diagram, derived from baseSvg
+ */
+function render(midi, baseSvg) {
   const fingering = FINGERINGS[midi];
-  const name = noteName(midi);
-  const closed = Object.entries(fingering)
-    .filter(([, s]) => s !== HOLE_STATE.OPEN)
-    .map(([id]) => HOLE_META[id].label);
-  const summary = closed.length === 0 ? 'all holes open'
-    : closed.length === 12 ? 'all holes covered'
-      : `cover ${closed.join(', ')}`;
+  const seen = new Set();
 
-  const front = Object.entries(FRONT_HOLES)
-    .map(([id, xy]) => holeMarkup(id, xy, fingering[id], 4)).join('\n');
-  const back = Object.entries(BACK_HOLES)
-    .map(([id, xy]) => holeMarkup(id, xy, fingering[id], 4)).join('\n');
+  const out = baseSvg.replace(ELEMENT, (el) => {
+    const elementId = /\sid="([^"]*)"/.exec(el)?.[1];
+    const hole = HOLE_BY_ELEMENT_ID.get(elementId);
+    if (!hole) return el;
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIEW_BOX.width} ${VIEW_BOX.height}"
-     role="img" aria-labelledby="title-${fingeringFileStem(midi)}">
-  <title id="title-${fingeringFileStem(midi)}">${name} fingering: ${summary}</title>
-  <!--
-    12-hole Alto C ocarina, ${name}.
-    Generated by scripts/render-fingerings.mjs, then free to redraw by hand.
+    seen.add(hole);
+    const state = fingering[hole];
+    if (state === HOLE_STATE.HALF) {
+      // base.svg has no half-filled hole to derive from, and the table never
+      // produces HALF today -- see fingerings.js for why. Fail loudly rather
+      // than silently emitting an unrecognised third colour.
+      throw new Error(`${noteName(midi)}: HOLE_STATE.HALF has no drawing to derive (hole ${hole})`);
+    }
+    return setFill(el, state === HOLE_STATE.CLOSED ? '#000000' : '#ffffff');
+  });
 
-    The app inlines whatever SVG it finds here, so nothing below is required:
-    redraw this however you like, at whatever size, in whatever style.
-
-    Optional, and worth keeping only if you want the safety net: an id of
-    "hole-L1" (etc.) plus a class of "closed"/"open"/"half" on each hole makes
-    the test suite check this drawing against the fingering table, so the two
-    cannot silently drift. Tag all twelve or none.
-
-    Using var(--ink) and var(--surface) lets the diagram follow the app's
-    light/dark theme. Hardcoded colours work too.
-
-    Holes: LT/RT are the thumb holes on the back. L1–L4 and R1–R4 are the
-    finger holes, index to pinky. SubL/SubR are the small subholes, covered
-    by the same middle fingers as L2/R2.
-  -->
-  <style>${STYLES}
-  </style>
-
-  <g id="front">
-    <path class="body" d="${FRONT_BODY}"/>
-${front}
-    <text class="caption" x="166" y="152">Front</text>
-  </g>
-
-  <g id="back" transform="translate(${BACK_OFFSET_X} 0)">
-    <path class="body" d="${BACK_BODY}"/>
-${back}
-    <text class="caption" x="88" y="152">Back (thumbs)</text>
-  </g>
-</svg>
-`;
+  const missing = HOLE_IDS.filter((id) => !seen.has(id));
+  if (missing.length) {
+    throw new Error(`base.svg is missing element(s) for: ${missing.map((id) => HOLE_META[id].elementId).join(', ')}`);
+  }
+  return out;
 }
 
 /**
@@ -150,14 +106,17 @@ function assertWellFormedComments(svg, label) {
 const args = new Set(process.argv.slice(2));
 const force = args.has('--force');
 const checkOnly = args.has('--check');
+const notes = allInstrumentNotes({ includeAccidentals: true });
 
 if (!checkOnly) mkdirSync(OUT_DIR, { recursive: true });
+
+const baseSvg = readFileSync(BASE_SVG_PATH, 'utf8');
 
 const written = [];
 const kept = [];
 const missing = [];
 
-for (const midi of allInstrumentNotes()) {
+for (const midi of notes) {
   const stem = fingeringFileStem(midi);
   const present = existsSync(join(OUT_DIR, `${stem}.svg`));
 
@@ -169,15 +128,14 @@ for (const midi of allInstrumentNotes()) {
     kept.push(`${stem}.svg`);
     continue;
   }
-  const target = stem;
-  const svg = render(midi);
-  assertWellFormedComments(svg, `${target}.svg`);
-  writeFileSync(join(OUT_DIR, `${target}.svg`), svg, 'utf8');
-  written.push(`${target}.svg`);
+  const svg = render(midi, baseSvg);
+  assertWellFormedComments(svg, `${stem}.svg`);
+  writeFileSync(join(OUT_DIR, `${stem}.svg`), svg, 'utf8');
+  written.push(`${stem}.svg`);
 }
 
 if (checkOnly) {
-  console.log(`${kept.length}/${allInstrumentNotes().length} fingering files present in public/${FINGERING_DIR}/`);
+  console.log(`${kept.length}/${notes.length} fingering files present in public/${FINGERING_DIR}/`);
   if (missing.length) {
     console.error(`Missing ${missing.length}: ${missing.join(', ')}`);
     console.error('Run: npm run render:fingerings');
