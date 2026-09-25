@@ -27,6 +27,31 @@ describe('walkthrough section', () => {
   });
 });
 
+describe('practice range', () => {
+  it('narrows the walkthrough to the given low/high, leaving the scale alone', () => {
+    const steps = buildTutorialSteps({ low: midiFromName('C5'), high: midiFromName('F5') });
+    const walkthrough = steps.filter((s) => s.section === TUTORIAL_SECTION.WALKTHROUGH);
+    expect(walkthrough.map((s) => s.name)).toEqual(['C5', 'D5', 'E5', 'F5']);
+
+    const scale = steps.filter((s) => s.section === TUTORIAL_SECTION.SCALE);
+    expect(scale.map((s) => s.name)).toEqual(['C5', 'D5', 'E5', 'F5', 'G5', 'A5', 'B5', 'C6']);
+  });
+
+  it('clamps a range wider than the instrument to what it can actually play', () => {
+    const steps = buildTutorialSteps({ low: 0, high: 200 });
+    const walkthrough = steps.filter((s) => s.section === TUTORIAL_SECTION.WALKTHROUGH);
+    expect(walkthrough[0].midi).toBe(INSTRUMENT_LOW);
+    expect(walkthrough[walkthrough.length - 1].midi).toBe(INSTRUMENT_HIGH);
+    expect(walkthrough).toHaveLength(13);
+  });
+
+  it('produces an empty walkthrough for an inverted range, leaving the scale intact', () => {
+    const steps = buildTutorialSteps({ low: 80, high: 70 });
+    expect(steps.filter((s) => s.section === TUTORIAL_SECTION.WALKTHROUGH)).toEqual([]);
+    expect(steps.filter((s) => s.section === TUTORIAL_SECTION.SCALE)).toHaveLength(8);
+  });
+});
+
 describe('scale section', () => {
   it('is the C major scale, C5 to C6, eight notes', () => {
     const steps = buildTutorialSteps();
