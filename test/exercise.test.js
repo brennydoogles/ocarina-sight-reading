@@ -36,6 +36,12 @@ describe('notePool', () => {
     expect(chromatic).toHaveLength(21);
     expect(chromatic.some((m) => !isNatural(m))).toBe(true);
   });
+
+  it('with includeAccidentals, contains every note in a narrower range and nothing outside it', () => {
+    // 70 = A#4, 76 = E5: every semitone in between, naturals and accidentals alike.
+    const pool = notePool({ low: 70, high: 76, includeAccidentals: true });
+    expect(pool).toEqual([70, 71, 72, 73, 74, 75, 76]);
+  });
 });
 
 describe('generateExercise', () => {
@@ -70,6 +76,13 @@ describe('generateExercise', () => {
     expect(ex[0].midi).toBe(72);
   });
 
+  it('can still repeat when a chromatic pool holds a single accidental', () => {
+    // Same deadlock hazard, but the one note in range is an accidental.
+    const single = { low: 70, high: 70, includeAccidentals: true };
+    const ex = generateExercise({ ...single, previous: [70] });
+    expect(ex[0].midi).toBe(70);
+  });
+
   it('returns an empty exercise when no notes are in range', () => {
     expect(generateExercise({ low: 80, high: 70 })).toEqual([]);
   });
@@ -85,6 +98,13 @@ describe('generateExercise', () => {
   it('is deterministic given a deterministic random source', () => {
     const a = generateExercise({ ...DEFAULTS, length: 6, random: makeSequence() });
     const b = generateExercise({ ...DEFAULTS, length: 6, random: makeSequence() });
+    expect(a.map((n) => n.midi)).toEqual(b.map((n) => n.midi));
+  });
+
+  it('is deterministic over a chromatic pool too', () => {
+    const range = { low: INSTRUMENT_LOW, high: INSTRUMENT_HIGH, includeAccidentals: true };
+    const a = generateExercise({ ...range, length: 6, random: makeSequence() });
+    const b = generateExercise({ ...range, length: 6, random: makeSequence() });
     expect(a.map((n) => n.midi)).toEqual(b.map((n) => n.midi));
   });
 
