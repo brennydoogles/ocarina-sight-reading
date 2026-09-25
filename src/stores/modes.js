@@ -19,23 +19,42 @@ export const useModesStore = defineStore('modes', () => {
   const multiIncludeAccidentals = ref(false);
   const songIncludeAccidentals = ref(false);
 
+  // Multi-Note Drills only (#9): whether to show phrases in rhythm, and if
+  // so at what tempo, plus how many notes make up a phrase. BPM/phrase length
+  // are stored even with rhythm off, so the toggle remembers the last value.
+  const multiRhythmEnabled = ref(false);
+  const multiBpm = ref(90);
+  const multiPhraseLength = ref(8);
+
   const fields = {
     tutorialIncludeAccidentals,
     singleIncludeAccidentals,
     multiIncludeAccidentals,
     songIncludeAccidentals,
+    multiRhythmEnabled,
+    multiBpm,
+    multiPhraseLength,
   };
 
   const BY_MODE = {
     tutorial: { includeAccidentals: tutorialIncludeAccidentals },
     single: { includeAccidentals: singleIncludeAccidentals },
-    multi: { includeAccidentals: multiIncludeAccidentals },
+    multi: {
+      includeAccidentals: multiIncludeAccidentals,
+      rhythmEnabled: multiRhythmEnabled,
+      bpm: multiBpm,
+      phraseLength: multiPhraseLength,
+    },
     song: { includeAccidentals: songIncludeAccidentals },
   };
 
   /**
    * @param {'tutorial'|'single'|'multi'|'song'} mode
-   * @returns {{ includeAccidentals: import('vue').Ref<boolean> }}
+   * @returns {{ includeAccidentals: import('vue').Ref<boolean> }
+   *   & (typeof mode extends 'multi'
+   *     ? { rhythmEnabled: import('vue').Ref<boolean>, bpm: import('vue').Ref<number>,
+   *         phraseLength: import('vue').Ref<number> }
+   *     : {})}
    */
   function optionsFor(mode) {
     return BY_MODE[mode];
@@ -71,6 +90,9 @@ export const useModesStore = defineStore('modes', () => {
     singleIncludeAccidentals,
     multiIncludeAccidentals,
     songIncludeAccidentals,
+    multiRhythmEnabled,
+    multiBpm,
+    multiPhraseLength,
     optionsFor,
   };
 });
