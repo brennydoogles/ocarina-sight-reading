@@ -9,6 +9,12 @@
 
 const EIGHTHS = [1, 2, 4, 8];
 const DURATION_FOR_EIGHTHS = { 1: '8', 2: 'q', 4: 'h', 8: 'w' };
+/**
+ * The inverse mapping, in quarter-note beats rather than eighths -- exported
+ * so a renderer can lay notes into bars without re-deriving VexFlow's
+ * duration vocabulary itself.
+ */
+export const QUARTERS_PER_DURATION = Object.freeze({ w: 4, h: 2, q: 1, 8: 0.5 });
 /** Favour short notes; a whole bar's worth in one note is a rare event. */
 const EIGHTHS_WEIGHT = { 1: 45, 2: 35, 4: 15, 8: 5 };
 
