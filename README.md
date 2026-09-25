@@ -144,7 +144,8 @@ self-signed certificate on your own network, and you can continue past it.
 ## How it works
 
 ```
-microphone → AnalyserNode (2048) → pitchy (McLeod) → gates → matcher → UI
+input:  microphone → AnalyserNode (2048) → pitchy (McLeod) → gates → matcher → UI
+output: metronome → OscillatorNode/GainNode click → destination (speaker)
 ```
 
 `src/audio/detector.js` is pure: it takes a `Float32Array` and returns a
@@ -164,6 +165,23 @@ Four gates run cheapest-first, each for a specific failure:
 Tolerance is configured in **cents**, not Hz: 10 Hz is a quarter-tone at A4 and a
 sixth of that at F6.
 
+The metronome (`src/audio/metronome.js` + `useMetronome.js`) is the app's only
+audio *output*. `metronome.js` is pure scheduling — given a BPM and the current
+time it says which click times are due next, with no Web Audio in it, the same
+split as the detector. `useMetronome.js` turns that into sound: a short,
+fast-decaying click per beat, scheduled ahead of time against
+`audioContext.currentTime` rather than driven directly by `setTimeout`/rAF, so
+it can't drift or stall in a backgrounded tab. It shares the microphone's
+`AudioContext` rather than opening a second one — browsers limit how many can
+exist, and mobile Safari is strict about resuming one outside a user gesture.
+
+The mic's constraints turn off echo cancellation (see below), so **the
+detector does hear the click** through the device speaker. It is pitched above
+`DETECTABLE_MAX_HZ` on purpose, so the range guard above rejects it as
+out-of-range rather than a candidate pitch, and its ~15 ms decay is far
+shorter than the sustain gate's ~200 ms requirement as a second line of
+defence.
+
 ## Layout
 
 ```
@@ -178,8 +196,10 @@ src/
 ├── audio/
 │   ├── detector.js     pure pitch analysis (unit-tested)
 │   ├── matcher.js      pure correct/incorrect state machine (unit-tested)
-│   ├── useMicrophone.js    getUserMedia + AudioContext lifecycle
-│   └── usePitchDetection.js  the rAF loop
+│   ├── metronome.js    pure click-track scheduling (unit-tested)
+│   ├── useMicrophone.js    getUserMedia + AudioContext lifecycle (input)
+│   ├── usePitchDetection.js  the rAF loop
+│   └── useMetronome.js     OscillatorNode click scheduling (output)
 ├── components/         Vue SFCs
 └── stores/             Pinia: settings and per-note stats (localStorage)
 ```
@@ -272,6 +292,14 @@ setting `autoGainControl` alone is ignored.
 installed PWA unable to draw a staff offline. The app imports `vexflow/bravura`,
 which bundles Bravura and Academico into the JS as base64. Nothing is fetched at
 runtime.
+
+**The metronome's click is audible to the microphone.** Disabling echo
+cancellation for pitch detection (above) means there is no echo cancellation
+to hide the click either — it plays through the device speaker and the mic
+picks it up. `useMetronome.js` picks a click pitch above the instrument's
+detectable range and a decay far shorter than the sustain gate specifically
+so the detector's own gates reject it rather than reading it as a note; see
+the comment at the top of that file for the numbers.
 
 ## Settings
 
