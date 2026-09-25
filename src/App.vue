@@ -1,6 +1,10 @@
 <script setup>
 import { ref } from 'vue';
+import ModePicker from './components/ModePicker.vue';
 import PracticeView from './components/PracticeView.vue';
+import TutorialView from './components/TutorialView.vue';
+import MultiNoteView from './components/MultiNoteView.vue';
+import SongPracticeView from './components/SongPracticeView.vue';
 import SettingsPanel from './components/SettingsPanel.vue';
 import StatsPanel from './components/StatsPanel.vue';
 import FingeringReference from './components/FingeringReference.vue';
@@ -12,6 +16,9 @@ const TABS = [
   { id: 'settings', label: 'Settings' },
 ];
 const tab = ref('practice');
+
+/** Selected practice mode, or null for the Practise tab's picker screen. */
+const mode = ref(null);
 </script>
 
 <template>
@@ -22,11 +29,22 @@ const tab = ref('practice');
     </header>
 
     <main>
+      <ModePicker v-if="tab === 'practice' && !mode" @select="mode = $event" />
+
+      <button v-if="tab === 'practice' && mode" class="back" @click="mode = null">
+        &larr; Modes
+      </button>
+
       <!-- PracticeView is kept alive so switching to Settings mid-session does
-           not tear down the microphone and lose the streak. -->
+           not tear down the microphone and lose the streak. Every mode view
+           gets the same treatment, for the same reason. -->
       <KeepAlive>
-        <PracticeView v-if="tab === 'practice'" />
+        <PracticeView v-if="tab === 'practice' && mode === 'single'" />
+        <TutorialView v-else-if="tab === 'practice' && mode === 'tutorial'" />
+        <MultiNoteView v-else-if="tab === 'practice' && mode === 'multi'" />
+        <SongPracticeView v-else-if="tab === 'practice' && mode === 'song'" />
       </KeepAlive>
+
       <FingeringReference v-if="tab === 'reference'" />
       <StatsPanel v-if="tab === 'stats'" />
       <SettingsPanel v-if="tab === 'settings'" />
@@ -59,6 +77,13 @@ h1 { margin: 0; font-size: 1.05rem; font-weight: 600; letter-spacing: -0.01em; }
 .sub { margin: 0.1rem 0 0; font-size: 0.75rem; color: var(--ink-faint); }
 
 main { flex: 1; padding-bottom: 1rem; }
+
+.back {
+  display: block; margin: 0 0 0.85rem; font: inherit; font-size: 0.8rem;
+  padding: 0.4rem 0.7rem; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-dim);
+  border-radius: 8px;
+}
 
 nav {
   position: sticky;
