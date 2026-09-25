@@ -64,14 +64,17 @@ export function notePool({ low, high, includeAccidentals = false }) {
 }
 
 /**
- * A note as the rest of the app passes it around.
- * @typedef {{ midi: number, name: string, hz: number }} Note
+ * A note as the rest of the app passes it around. `duration` follows
+ * VexFlow's own vocabulary ('w', 'h', 'q', '8') so the renderer never needs a
+ * translation table.
+ * @typedef {{ midi: number, name: string, hz: number, duration: string }} Note
  */
 
 /**
  * @param {number} midi
+ * @param {string} [duration] VexFlow duration code; defaults to a quarter.
  * @returns {Note}
  */
-export function makeNote(midi) {
-  return { midi, name: noteName(midi), hz: midiToHz(midi) };
+export function makeNote(midi, duration = 'q') {
+  return { midi, name: noteName(midi), hz: midiToHz(midi), duration };
 }
