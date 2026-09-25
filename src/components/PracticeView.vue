@@ -9,6 +9,7 @@ import { NoteMatcher, MATCH } from '../audio/matcher.js';
 import { generateExercise } from '../music/exercise.js';
 import { useSettingsStore } from '../stores/settings.js';
 import { useSessionStore } from '../stores/session.js';
+import { PRACTICE_MODE } from '../stores/practiceModes.js';
 import { noteName } from '../music/pitch.js';
 import { READING } from '../audio/detector.js';
 
@@ -83,6 +84,7 @@ function onFrame(reading, now) {
       midi: m.target,
       ms: m.timeToCorrect ?? 0,
       hinted: m.hintShown,
+      mode: PRACTICE_MODE.SINGLE,
     });
     // A beat on the green note before moving on, so success registers.
     advanceTimer = setTimeout(nextExercise, 700);
