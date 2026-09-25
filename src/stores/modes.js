@@ -1,10 +1,10 @@
 import { defineStore } from 'pinia';
 import { ref, watch } from 'vue';
+import { PRACTICE_MODES } from './practiceModes.js';
 
 const STORAGE_KEY = 'ocarina.modes.v1';
 
-/** The four practice modes, in picker order. */
-export const PRACTICE_MODES = Object.freeze(['tutorial', 'single', 'multi', 'song']);
+export { PRACTICE_MODES };
 
 /**
  * Per-mode practice options -- separate from src/stores/settings.js, which

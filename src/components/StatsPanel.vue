@@ -1,5 +1,6 @@
 <script setup>
 import { useSessionStore } from '../stores/session.js';
+import { PRACTICE_MODE_LABELS } from '../stores/practiceModes.js';
 import FingeringChart from './FingeringChart.vue';
 
 const session = useSessionStore();
@@ -25,6 +26,26 @@ const fmt = (ms) => (ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(m
         </div>
       </div>
 
+      <div class="modes">
+        <h3>By mode</h3>
+        <table>
+          <thead>
+            <tr><th>Mode</th><th>Tries</th><th>Avg</th><th>Hints</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in session.modeBreakdown" :key="row.mode">
+              <td class="note">{{ PRACTICE_MODE_LABELS[row.mode] }}</td>
+              <td>{{ row.attempts || '—' }}</td>
+              <td>{{ row.attempts ? fmt(row.avgMs) : '—' }}</td>
+              <td :class="{ warn: row.hintRate > 0.5 }">
+                {{ row.attempts ? `${Math.round(row.hintRate * 100)}%` : '—' }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Weakest notes</h3>
       <table>
         <thead>
           <tr><th>Note</th><th>Tries</th><th>Avg</th><th>Best</th><th>Hints</th></tr>
@@ -62,6 +83,8 @@ h2 { margin: 0; font-size: 1rem; font-weight: 600; }
 }
 .tile .n { font-size: 1.15rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .tile .l { font-size: 0.65rem; color: var(--ink-faint); line-height: 1.2; }
+.modes { display: flex; flex-direction: column; gap: 0.5rem; }
+h3 { margin: 0; font-size: 0.8rem; font-weight: 600; color: var(--ink-dim); }
 table { width: 100%; border-collapse: collapse; font-size: 0.8rem; font-variant-numeric: tabular-nums; }
 th, td { padding: 0.35rem 0.3rem; text-align: right; border-bottom: 1px solid var(--line); }
 th:first-child, td:first-child { text-align: left; }
