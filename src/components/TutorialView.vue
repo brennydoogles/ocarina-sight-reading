@@ -28,8 +28,11 @@ const options = modes.optionsFor('tutorial');
 const mic = useMicrophone({ fftSize: 2048 });
 const detection = usePitchDetection(mic, () => settings.detectorConfig);
 
-const steps = computed(() =>
-  buildTutorialSteps({ includeAccidentals: options.includeAccidentals.value }));
+const steps = computed(() => buildTutorialSteps({
+  includeAccidentals: options.includeAccidentals.value,
+  low: settings.practiceLow,
+  high: settings.practiceHigh,
+}));
 /** Never clamped -- only the DISPLAYED index is. Flipping the toggle back
  *  on restores a deeper position instead of losing it to the clamp. */
 const isComplete = computed(() => progress.stepIndex >= steps.value.length);
@@ -120,9 +123,10 @@ function restart() {
   if (running.value) beginStep();
 }
 
-// Toggling accidentals mid-session changes the step list under the current
-// index; re-arm the matcher for whatever note is now current.
-watch(() => options.includeAccidentals.value, () => {
+// Toggling accidentals, or changing the practice range in Settings,
+// mid-session changes the step list under the current index; re-arm the
+// matcher for whatever note is now current.
+watch(() => [options.includeAccidentals.value, settings.practiceLow, settings.practiceHigh], () => {
   if (running.value) beginStep();
 });
 
@@ -164,7 +168,7 @@ onUnmounted(stop);
       </template>
       <template v-else>
         <p class="blurb">
-          A guided walk through every note on the instrument, one at a time,
+          A guided walk through your practice range, one note at a time,
           then the C major scale. The fingering is always shown — this is
           for learning, not testing.
         </p>
@@ -181,7 +185,7 @@ onUnmounted(stop);
     <template v-else-if="isComplete">
       <div class="done">
         <h3>Tutorial complete</h3>
-        <p>You've worked through every note{{ options.includeAccidentals.value ? ' and accidental' : '' }} and the C major scale.</p>
+        <p>You've worked through your practice range and the C major scale.</p>
         <button class="primary" @click="restart">Restart</button>
       </div>
     </template>
