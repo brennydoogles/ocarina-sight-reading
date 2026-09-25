@@ -15,6 +15,7 @@ export default [
         AudioContext: 'readonly', MediaStream: 'readonly', Float32Array: 'readonly',
         requestAnimationFrame: 'readonly', cancelAnimationFrame: 'readonly',
         setTimeout: 'readonly', clearTimeout: 'readonly', process: 'readonly',
+        setInterval: 'readonly', clearInterval: 'readonly',
         DOMException: 'readonly', ResizeObserver: 'readonly',
         getComputedStyle: 'readonly', AnalyserNode: 'readonly',
         fetch: 'readonly', DOMParser: 'readonly',

@@ -154,5 +154,12 @@ export function useMicrophone({ fftSize = 2048 } = {}) {
 
   onScopeDispose(stop);
 
-  return { status, error, sampleRate, appliedConstraints, start, stop, readFrame };
+  // context is exposed read-only-in-spirit so useMetronome.js can share it
+  // rather than opening a second AudioContext -- browsers limit how many can
+  // exist, and mobile Safari is strict about resuming one outside a user
+  // gesture, so reusing the one the mic permission prompt already unlocked
+  // is the reliable choice. Everything else here stays private: the source
+  // node in particular must keep exactly this one live reference (see
+  // above), and handing it out would risk a second owner dropping it.
+  return { status, error, sampleRate, appliedConstraints, context, start, stop, readFrame };
 }
