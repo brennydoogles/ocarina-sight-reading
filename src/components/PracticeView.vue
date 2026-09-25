@@ -7,14 +7,18 @@ import { useMicrophone, MIC } from '../audio/useMicrophone.js';
 import { usePitchDetection } from '../audio/usePitchDetection.js';
 import { NoteMatcher, MATCH } from '../audio/matcher.js';
 import { generateExercise } from '../music/exercise.js';
+import { notePool } from '../music/notes.js';
 import { useSettingsStore } from '../stores/settings.js';
 import { useSessionStore } from '../stores/session.js';
+import { useModesStore } from '../stores/modes.js';
 import { PRACTICE_MODE } from '../stores/practiceModes.js';
 import { noteName } from '../music/pitch.js';
 import { READING } from '../audio/detector.js';
 
 const settings = useSettingsStore();
 const session = useSessionStore();
+const modes = useModesStore();
+const options = modes.optionsFor(PRACTICE_MODE.SINGLE);
 
 const mic = useMicrophone({ fftSize: 2048 });
 const detection = usePitchDetection(mic, () => settings.detectorConfig);
@@ -32,6 +36,18 @@ let advanceTimer = null;
 
 const target = computed(() => exercise.value[0] ?? null);
 const running = computed(() => mic.status.value === MIC.READY && detection.running.value);
+
+/**
+ * The pool this session actually draws from. Not settings.pool -- that one
+ * is always naturals-only, so it can under- or over-report "no notes in
+ * range" once accidentals are in play (e.g. a one-note range that lands
+ * exactly on an accidental has zero naturals but one playable note).
+ */
+const pool = computed(() => notePool({
+  low: settings.practiceLow,
+  high: settings.practiceHigh,
+  includeAccidentals: options.includeAccidentals.value,
+}));
 
 /** A wake lock so the phone does not sleep mid-practice. Best-effort. */
 let wakeLock = null;
@@ -63,6 +79,7 @@ function nextExercise() {
   exercise.value = generateExercise({
     low: settings.practiceLow,
     high: settings.practiceHigh,
+    includeAccidentals: options.includeAccidentals.value,
     previous: exercise.value.map((n) => n.midi),
   });
   if (!target.value) return;
@@ -111,9 +128,9 @@ function skip() {
   nextExercise();
 }
 
-// Changing the practice range mid-session should take effect now, not on the
-// next correct answer.
-watch(() => [settings.practiceLow, settings.practiceHigh], () => {
+// Changing the practice range, or the semitones toggle, mid-session should
+// take effect now, not on the next correct answer.
+watch(() => [settings.practiceLow, settings.practiceHigh, options.includeAccidentals.value], () => {
   if (running.value) nextExercise();
 });
 
@@ -142,6 +159,11 @@ onUnmounted(stop);
 
 <template>
   <section class="practice">
+    <label class="toggle">
+      <input type="checkbox" v-model="options.includeAccidentals.value" />
+      Include sharps
+    </label>
+
     <!-- Pre-flight: microphone permission and failure states. -->
     <div v-if="!running" class="gate">
       <template v-if="mic.status.value === MIC.DENIED || mic.status.value === MIC.UNSUPPORTED || mic.status.value === MIC.ERROR">
@@ -156,7 +178,7 @@ onUnmounted(stop);
         <button class="primary" :disabled="mic.status.value === MIC.REQUESTING" @click="begin">
           {{ mic.status.value === MIC.REQUESTING ? 'Waiting for microphone…' : 'Start practising' }}
         </button>
-        <p v-if="settings.pool.length === 0" class="error">
+        <p v-if="pool.length === 0" class="error">
           The practice range contains no notes. Widen it in Settings.
         </p>
       </template>
@@ -214,6 +236,10 @@ onUnmounted(stop);
 
 <style scoped>
 .practice { display: flex; flex-direction: column; gap: 1rem; align-items: center; }
+.toggle {
+  align-self: flex-start; display: flex; align-items: center; gap: 0.4rem;
+  font-size: 0.8rem; color: var(--ink-dim); cursor: pointer;
+}
 .gate { display: flex; flex-direction: column; gap: 1rem; align-items: center; text-align: center; padding: 2rem 0; }
 .blurb { margin: 0; max-width: 34ch; color: var(--ink-dim); font-size: 0.9rem; line-height: 1.55; }
 .error { margin: 0; max-width: 40ch; color: var(--accent-warn); font-size: 0.85rem; line-height: 1.5; }
