@@ -147,8 +147,12 @@ describe('generateExercise', () => {
 
 describe('makeNote', () => {
   it('carries the name and frequency alongside the MIDI number', () => {
-    expect(makeNote(69)).toEqual({ midi: 69, name: 'A4', hz: 440 });
+    expect(makeNote(69)).toEqual({ midi: 69, name: 'A4', hz: 440, duration: 'q' });
     expect(makeNote(89).hz).toBeCloseTo(midiToHz(89), 9);
+  });
+
+  it('takes an explicit duration', () => {
+    expect(makeNote(69, 'h')).toEqual({ midi: 69, name: 'A4', hz: 440, duration: 'h' });
   });
 });
 
