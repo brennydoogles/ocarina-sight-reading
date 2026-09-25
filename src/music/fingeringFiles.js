@@ -1,12 +1,14 @@
 /**
  * Maps a note to the SVG file that draws its fingering.
  *
- * The diagrams are hand-drawn files under `public/fingerings/12_hole/`, not
- * generated at runtime, so this mapping is the contract between the app and
- * those files. Keep it pure -- both the app and the render script import it,
- * and a test asserts every note in range resolves to a file that exists.
+ * The diagrams are static files under `public/fingerings/12_hole/`, not
+ * generated at runtime -- the 13 naturals are hand-drawn, the 8 accidentals
+ * are derived from `base.svg` by `scripts/render-fingerings.mjs` -- so this
+ * mapping is the contract between the app and those files. Keep it pure --
+ * both the app and the render script import it, and a test asserts every
+ * note in range resolves to a file that exists.
  */
-import { isNatural, noteName } from './pitch.js';
+import { noteName } from './pitch.js';
 
 /**
  * Which instrument these diagrams describe. Fingerings are per-instrument, so
@@ -19,21 +21,16 @@ export const INSTRUMENT_KEY = '12_hole';
 export const FINGERING_DIR = `fingerings/${INSTRUMENT_KEY}`;
 
 /**
- * File stem for a note, e.g. 69 -> "A4".
+ * File stem for a note, e.g. 69 -> "A4", 70 -> "Asharp4".
  *
- * Only naturals have diagrams, which conveniently means a stem is just the
- * note name: no accidental, so nothing to spell out and no '#' to collide
- * with a URL fragment.
+ * '#' is not safe in a URL -- it starts a fragment -- so an accidental's
+ * stem spells the sharp out instead of using the symbol noteName() gives it.
  *
  * @param {number} midi
  * @returns {string}
- * @throws {Error} for an accidental, which has no diagram by design
  */
 export function fingeringFileStem(midi) {
-  if (!isNatural(midi)) {
-    throw new Error(`No fingering diagram for ${noteName(midi)}: this app covers naturals only`);
-  }
-  return noteName(midi);
+  return noteName(midi).replace('#', 'sharp');
 }
 
 /**

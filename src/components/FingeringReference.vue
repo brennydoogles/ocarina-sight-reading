@@ -2,14 +2,18 @@
 import { ref } from 'vue';
 import FingeringChart from './FingeringChart.vue';
 import { allInstrumentNotes } from '../music/notes.js';
-import { noteName } from '../music/pitch.js';
+import { noteName, isNatural } from '../music/pitch.js';
 import { fingeringFileStem, FINGERING_DIR } from '../music/fingeringFiles.js';
 import { clearFingeringCache } from '../music/fingeringAssets.js';
 
 /** Bumped to force every chart to re-fetch after the cache is cleared. */
 const revision = ref(0);
 
-const notes = allInstrumentNotes();
+const notes = allInstrumentNotes({ includeAccidentals: true });
+// Split rather than one long grid: 21 diagrams at phone width is a lot of
+// scrolling, and the naturals are the ones most players want first.
+const naturals = notes.filter(isNatural);
+const accidentals = notes.filter((m) => !isNatural(m));
 
 function reloadDiagrams() {
   clearFingeringCache();
@@ -29,13 +33,23 @@ function reloadDiagrams() {
     </p>
 
     <div class="controls">
-      <span>{{ notes.length }} naturals, A4 to F6</span>
+      <span>{{ notes.length }} notes, A4 to F6 chromatic</span>
       <button class="reload" @click="reloadDiagrams">Reload diagrams</button>
     </div>
 
+    <h3 class="group-heading">Naturals</h3>
     <div class="grid">
-      <article v-for="midi in notes" :key="midi" class="cell">
-        <h3>{{ noteName(midi) }}</h3>
+      <article v-for="midi in naturals" :key="midi" class="cell">
+        <h4>{{ noteName(midi) }}</h4>
+        <FingeringChart :key="`${midi}-${revision}`" :midi="midi" compact />
+        <code class="file">{{ fingeringFileStem(midi) }}.svg</code>
+      </article>
+    </div>
+
+    <h3 class="group-heading">Accidentals</h3>
+    <div class="grid">
+      <article v-for="midi in accidentals" :key="midi" class="cell">
+        <h4>{{ noteName(midi) }}</h4>
         <FingeringChart :key="`${midi}-${revision}`" :midi="midi" compact />
         <code class="file">{{ fingeringFileStem(midi) }}.svg</code>
       </article>
@@ -43,8 +57,7 @@ function reloadDiagrams() {
 
     <p class="legend">
       Filled circles are covered holes, outlined ones open. The small circles
-      are the subholes, played by the middle fingers. Accidentals are out of
-      scope for now — there are no sharps or flats to draw.
+      are the subholes, played by the middle fingers.
     </p>
   </section>
 </template>
@@ -64,9 +77,13 @@ h2 { margin: 0; font-size: 1rem; font-weight: 600; }
   border: 1px solid var(--line); background: var(--surface-2);
   color: var(--ink-dim); border-radius: 7px; cursor: pointer;
 }
+.group-heading {
+  margin: 0; font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--ink-faint);
+}
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 0.9rem; }
 .cell { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 0.6rem; }
-.cell h3 {
+.cell h4 {
   margin: 0 0 0.4rem; font-size: 0.85rem; font-weight: 700;
   display: flex; align-items: center; gap: 0.4rem;
 }

@@ -11,6 +11,9 @@ import { HOLE_IDS, HOLE_META, HOLE_STATE, FINGERINGS } from '../src/music/finger
 
 const DIR = join(process.cwd(), 'public', FINGERING_DIR);
 
+/** All 21 notes -- naturals and accidentals alike -- now that both have diagrams. */
+const ALL_NOTES = allInstrumentNotes({ includeAccidentals: true });
+
 describe('file naming', () => {
   it('namespaces diagrams by instrument', () => {
     expect(INSTRUMENT_KEY).toBe('12_hole');
@@ -23,25 +26,31 @@ describe('file naming', () => {
     expect(fingeringFileStem(midiFromName('F6'))).toBe('F6');
   });
 
-  it('refuses accidentals, which have no diagram by design', () => {
-    for (const name of ['A#4', 'C#5', 'D#5', 'D#6']) {
-      expect(() => fingeringFileStem(midiFromName(name)), name).toThrow(/naturals only/);
-    }
+  it('spells an accidental out instead of throwing', () => {
+    expect(fingeringFileStem(midiFromName('A#4'))).toBe('Asharp4');
+    expect(fingeringFileStem(midiFromName('C#5'))).toBe('Csharp5');
+    expect(fingeringFileStem(midiFromName('D#5'))).toBe('Dsharp5');
+    expect(fingeringFileStem(midiFromName('D#6'))).toBe('Dsharp6');
   });
 
   it('never produces a "#", which would break the URL', () => {
-    for (const midi of allInstrumentNotes()) {
+    for (const midi of ALL_NOTES) {
       expect(fingeringFileStem(midi)).not.toContain('#');
     }
   });
 
-  it('only names naturals', () => {
+  it('defaults to naturals only, so existing callers are unaffected', () => {
     expect(allInstrumentNotes().every(isNatural)).toBe(true);
     expect(allInstrumentNotes()).toHaveLength(13);
   });
 
+  it('covers all 21 notes with includeAccidentals: true', () => {
+    expect(ALL_NOTES).toHaveLength(21);
+    expect(ALL_NOTES.some((m) => !isNatural(m))).toBe(true);
+  });
+
   it('gives every note a distinct filename', () => {
-    const stems = allInstrumentNotes().map(fingeringFileStem);
+    const stems = ALL_NOTES.map(fingeringFileStem);
     expect(new Set(stems).size).toBe(stems.length);
   });
 
@@ -53,7 +62,7 @@ describe('file naming', () => {
 
 describe('the diagram files on disk', () => {
   it('exist for every note the app drills', () => {
-    const missing = allInstrumentNotes().filter(
+    const missing = ALL_NOTES.filter(
       (midi) => !existsSync(join(DIR, `${fingeringFileStem(midi)}.svg`)));
     expect(missing.map(noteName)).toEqual([]);
   });
@@ -63,7 +72,7 @@ describe('the diagram files on disk', () => {
     // hand-made templates -- are the author's working material and ignored.
     // A note-SHAPED name that is not one we drill is a mistake: a leftover
     // accidental, or a typo'd rename like D7.svg.
-    const expected = new Set(allInstrumentNotes().map(fingeringFileStem));
+    const expected = new Set(ALL_NOTES.map(fingeringFileStem));
     const NOTE_SHAPED = /^[A-G](flat|sharp|#|b)?-?\d$/;
     const strays = readdirSync(DIR)
       .filter((f) => f.endsWith('.svg'))
@@ -76,13 +85,13 @@ describe('the diagram files on disk', () => {
     // Parsed for real, not regex-matched. SVG is XML, so a stray "--" inside a
     // comment or an unescaped "&" takes the whole file down -- and the browser
     // is a poor place to discover that.
-    for (const midi of allInstrumentNotes()) {
+    for (const midi of ALL_NOTES) {
       expect(() => parse(midi), `${noteName(midi)} is not well-formed XML`).not.toThrow();
     }
   });
 
   it('have an <svg> root with a viewBox', () => {
-    for (const midi of allInstrumentNotes()) {
+    for (const midi of ALL_NOTES) {
       const root = parse(midi).window.document.documentElement;
       expect(root.tagName.toLowerCase(), noteName(midi)).toBe('svg');
       expect(root.getAttribute('viewBox'), noteName(midi)).toBeTruthy();
@@ -90,7 +99,7 @@ describe('the diagram files on disk', () => {
   });
 
   it('keep "--" out of XML comments, which is illegal and unparseable', () => {
-    for (const midi of allInstrumentNotes()) {
+    for (const midi of ALL_NOTES) {
       for (const [, body] of read(midi).matchAll(/<!--([\s\S]*?)-->/g)) {
         expect(body, `${noteName(midi)} has an illegal XML comment`).not.toContain('--');
       }
@@ -98,12 +107,13 @@ describe('the diagram files on disk', () => {
   });
 
   /*
-   * The diagrams are hand-drawn, so nothing forces them to agree with the
-   * fingering table -- and a diagram that disagrees teaches the wrong
+   * The naturals are hand-drawn and the accidentals are generated once, then
+   * free to redraw -- either way, nothing forces a file to agree with the
+   * fingering table, and a diagram that disagrees teaches the wrong
    * fingering, which is worse than having no diagram at all. These tests close
    * that gap using what the artwork already provides: every hole carries an id
-   * (see scripts/tag-hole-ids.mjs) and is filled black when covered, white when
-   * open.
+   * (see scripts/tag-hole-ids.mjs and scripts/render-fingerings.mjs) and is
+   * filled black when covered, white when open.
    */
 
   /**
@@ -121,7 +131,7 @@ describe('the diagram files on disk', () => {
   }
 
   it('give every hole an id, so a hole can be found rather than counted', () => {
-    for (const midi of allInstrumentNotes()) {
+    for (const midi of ALL_NOTES) {
       const doc = parse(midi).window.document;
       const missing = HOLE_IDS.filter((h) => !holeElement(doc, h));
       expect(missing.map((h) => HOLE_META[h].elementId), `${noteName(midi)} is missing holes`)
@@ -130,7 +140,7 @@ describe('the diagram files on disk', () => {
   });
 
   it('use ids that are unique within a file', () => {
-    for (const midi of allInstrumentNotes()) {
+    for (const midi of ALL_NOTES) {
       const text = read(midi);
       for (const hole of HOLE_IDS) {
         const id = HOLE_META[hole].elementId;
@@ -141,7 +151,7 @@ describe('the diagram files on disk', () => {
   });
 
   it('fill every hole with a colour that means something', () => {
-    for (const midi of allInstrumentNotes()) {
+    for (const midi of ALL_NOTES) {
       const doc = parse(midi).window.document;
       for (const hole of HOLE_IDS) {
         const fill = fillOf(holeElement(doc, hole));
@@ -154,7 +164,7 @@ describe('the diagram files on disk', () => {
   });
 
   it('draw each hole in the state the fingering table calls for', () => {
-    for (const midi of allInstrumentNotes()) {
+    for (const midi of ALL_NOTES) {
       const doc = parse(midi).window.document;
       for (const hole of HOLE_IDS) {
         const drawn = FILL_STATE[fillOf(holeElement(doc, hole))];
@@ -167,7 +177,7 @@ describe('the diagram files on disk', () => {
   });
 
   it('contain no scripting', () => {
-    for (const midi of allInstrumentNotes()) {
+    for (const midi of ALL_NOTES) {
       const text = read(midi);
       expect(text, noteName(midi)).not.toMatch(/<script[\s>]/i);
       expect(text, noteName(midi)).not.toMatch(/\son\w+\s*=/i);
