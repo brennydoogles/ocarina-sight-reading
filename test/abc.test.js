@@ -19,6 +19,16 @@ describe('parseAbc', () => {
     expect(parsed.notes.map((n) => n.duration)).toEqual([0.25, 0.125]);
   });
 
+  it('accumulates a startTime per event, in whole-note fractions', async () => {
+    const parsed = await parseAbc('X:1\nL:1/8\nK:C\nA2 B z4 |]\n');
+    expect(parsed.notes.map((n) => n.startTime)).toEqual([0, 0.25, 0.375]);
+  });
+
+  it('gives every pitch of a chord the same startTime', async () => {
+    const parsed = await parseAbc(tune('[A c] D'));
+    expect(parsed.notes.map((n) => n.startTime)).toEqual([0, 0, 0.25]);
+  });
+
   it('includes rests in the sequence', async () => {
     const parsed = await parseAbc(tune('A z B'));
     expect(parsed.notes.map((n) => n.isRest)).toEqual([false, true, false]);

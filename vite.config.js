@@ -34,7 +34,11 @@ export default defineConfig({
       workbox: {
         // Bravura is bundled into the JS as base64, so caching the JS caches the
         // fonts too -- there is nothing to fetch from a CDN at runtime.
-        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // mp3 covers public/soundfonts/ocarina-mp3/ -- the one instrument, and
+        // only the notes this instrument's A4-F6 range needs, from abcjs's
+        // default soundfont, bundled locally (~525KB) instead of left as a
+        // CDN fetch, so playback works offline like everything else.
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2,mp3}'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
       },
     }),
