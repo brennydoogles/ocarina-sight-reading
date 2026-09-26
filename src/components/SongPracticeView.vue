@@ -2,11 +2,14 @@
 import { ref, shallowRef, onMounted, onUnmounted, watch } from 'vue';
 import { useSongsStore } from '../stores/songs.js';
 import { validateSong, transposeAbc, loadAbcjs } from '../music/abc.js';
+import SongSession from './SongSession.vue';
 
 const songs = useSongsStore();
 
-/** 'list' browses the library; 'edit' is the add/edit form (both share it). */
+/** 'list' browses the library; 'edit' is the add/edit form; 'practice' is
+ *  an actual play-along session (see SongSession.vue). */
 const mode = ref('list');
+const practicingSong = shallowRef(null);
 const editingId = ref(null);
 const title = ref('');
 const abc = ref('');
@@ -61,6 +64,16 @@ function startEdit(song) {
   abc.value = song.abc;
   mode.value = 'edit';
   runValidation();
+}
+
+function startPractice(song) {
+  practicingSong.value = song;
+  mode.value = 'practice';
+}
+
+function backToLibrary() {
+  practicingSong.value = null;
+  mode.value = 'list';
 }
 
 function cancel() {
@@ -168,6 +181,7 @@ onUnmounted(() => {
             <p class="song-date">Added {{ formatDate(song.addedAt) }}</p>
           </div>
           <div class="song-actions">
+            <button class="primary" @click="startPractice(song)">Practise</button>
             <button @click="startEdit(song)">Edit</button>
             <button
               class="danger"
@@ -178,6 +192,8 @@ onUnmounted(() => {
         </li>
       </ul>
     </template>
+
+    <SongSession v-else-if="mode === 'practice'" :song="practicingSong" @back="backToLibrary" />
 
     <template v-else>
       <div class="field">
@@ -256,13 +272,13 @@ onUnmounted(() => {
 
 .song-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
 .song-row {
-  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+  display: flex; flex-direction: column; gap: 0.6rem;
   padding: 0.7rem 0.85rem; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2);
 }
 .song-info { min-width: 0; }
 .song-title { margin: 0; font-size: 0.9rem; font-weight: 600; color: var(--ink); }
 .song-date { margin: 0.15rem 0 0; font-size: 0.75rem; color: var(--ink-faint); }
-.song-actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
+.song-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 
 button {
   font: inherit; font-size: 0.85rem; padding: 0.55rem 0.9rem; cursor: pointer;

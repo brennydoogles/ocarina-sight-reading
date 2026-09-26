@@ -63,6 +63,20 @@ describe('parseAbc', () => {
     expect(parsed.bpm).toBe(100);
   });
 
+  it('exposes the opening key signature for a renderer to draw', async () => {
+    const parsed = await parseAbc(tune('A B c', { key: 'D' }));
+    expect(parsed.keySignature.root).toBe('D');
+    expect(parsed.keySignature.accidentals).toEqual([
+      { acc: 'sharp', note: 'f', verticalPos: expect.any(Number) },
+      { acc: 'sharp', note: 'c', verticalPos: expect.any(Number) },
+    ]);
+  });
+
+  it('has no accidentals to report for an empty tune', async () => {
+    const parsed = await parseAbc('');
+    expect(parsed.keySignature?.accidentals ?? []).toEqual([]);
+  });
+
   it('flags chords', async () => {
     const parsed = await parseAbc(tune('[CEG] D'));
     expect(parsed.features.hasChords).toBe(true);
