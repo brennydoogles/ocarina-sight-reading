@@ -98,6 +98,9 @@ function keyAccidentalTable(keySignature) {
  * @property {string|null} title
  * @property {{num: number, den: number}|null} meter
  * @property {number|null} bpm
+ * @property {{accidentals: {acc:string,note:string}[], root:string, acc:string, mode:string}|null} keySignature
+ *   the tune's opening key signature, straight from `abcjs` -- a renderer's
+ *   source for what to draw at the clef (see also each note's own `flats`)
  * @property {AbcEvent[]} notes in performance order; only the first voice of
  *   the first staff of each line -- see `hasMultipleVoices` below for why
  *   that is exactly the case worth flagging rather than silently mixing in
@@ -120,7 +123,7 @@ export async function parseAbc(source) {
   const tune = tunes?.[0];
   if (!tune) {
     return {
-      title: null, meter: null, bpm: null, notes: [],
+      title: null, meter: null, bpm: null, keySignature: null, notes: [],
       features: { hasChords: false, hasMultipleVoices: false, hasGraceNotes: false, hasRepeats: false, hasMicrotones: false },
       warnings: ['Could not parse this as ABC notation.'],
     };
@@ -142,7 +145,11 @@ export async function parseAbc(source) {
     }
   }
 
-  let keyTable = keyAccidentalTable(tune.getKeySignature?.());
+  // The tune's OPENING key signature -- what a renderer draws at the clef.
+  // A mid-tune key change (below) still updates pitch resolution, but
+  // drawing a new key signature partway through a score is out of scope.
+  const initialKeySignature = tune.getKeySignature?.() ?? null;
+  let keyTable = keyAccidentalTable(initialKeySignature);
   const barAccidentals = new Map();
   const notes = [];
   let bar = 1;
@@ -204,6 +211,7 @@ export async function parseAbc(source) {
     title: tune.metaText?.title ?? null,
     meter: meterFraction,
     bpm: tune.getBpm?.() ?? null,
+    keySignature: initialKeySignature,
     notes,
     features,
     warnings,

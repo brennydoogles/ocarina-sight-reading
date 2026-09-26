@@ -110,4 +110,16 @@ export class SequenceMatcher {
     this.index += 1;
     this.#arm(now);
   }
+
+  /**
+   * Jumps to an arbitrary point in the sequence -- backs "resume from bar"
+   * in Song Practice. Like `skip()`, nothing between the old and new
+   * position is credited or penalised; this just picks up somewhere else.
+   * @param {number} index
+   * @param {number} now
+   */
+  seekTo(index, now) {
+    this.index = Math.max(0, Math.min(index, this.targets.length));
+    this.#arm(now);
+  }
 }

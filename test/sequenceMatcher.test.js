@@ -146,6 +146,48 @@ describe('skip', () => {
   });
 });
 
+describe('seekTo', () => {
+  it('jumps forward to an arbitrary index without crediting anything skipped', () => {
+    const s = new SequenceMatcher([C5, D5, E5, D5], { sustainMs: 0 });
+    s.seekTo(2, 0);
+    expect(s.index).toBe(2);
+    expect(s.completed).toEqual([]);
+    expect(s.update(at(E5), 0)).toBe(MATCH.CORRECT);
+    expect(s.index).toBe(3);
+  });
+
+  it('jumps backward too, e.g. to replay an earlier bar', () => {
+    const s = new SequenceMatcher([C5, D5, E5], { sustainMs: 0 });
+    s.update(at(C5), 0);
+    s.update(at(D5), 0);
+    expect(s.index).toBe(2);
+    s.seekTo(0, 100);
+    expect(s.index).toBe(0);
+    expect(s.update(at(C5), 100)).toBe(MATCH.CORRECT);
+  });
+
+  it('clamps below zero to the start', () => {
+    const s = new SequenceMatcher([C5, D5], { sustainMs: 0 });
+    s.seekTo(-5, 0);
+    expect(s.index).toBe(0);
+  });
+
+  it('clamps past the end to done', () => {
+    const s = new SequenceMatcher([C5, D5], { sustainMs: 0 });
+    s.seekTo(50, 0);
+    expect(s.index).toBe(2);
+    expect(s.done).toBe(true);
+  });
+
+  it('resets the hint clock for whatever is now current', () => {
+    const s = new SequenceMatcher([C5, D5, E5], { hintTimeoutMs: 1000 });
+    s.tick(1000);
+    expect(s.matcher.hintShown).toBe(true);
+    s.seekTo(1, 2000);
+    expect(s.matcher.hintShown).toBe(false);
+  });
+});
+
 describe('hints and ticking', () => {
   it('shows the hint on the current note after the timeout, via tick', () => {
     const s = new SequenceMatcher([C5, D5], { hintTimeoutMs: 1000 });
