@@ -19,6 +19,7 @@ export default [
         DOMException: 'readonly', ResizeObserver: 'readonly',
         getComputedStyle: 'readonly', AnalyserNode: 'readonly',
         fetch: 'readonly', DOMParser: 'readonly',
+        Blob: 'readonly', URL: 'readonly', FileReader: 'readonly', crypto: 'readonly',
       },
     },
     rules: {
