@@ -3,6 +3,7 @@ import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import basicSsl from '@vitejs/plugin-basic-ssl';
 import { VitePWA } from 'vite-plugin-pwa';
+import { songsManifestPlugin } from './vite-songs-plugin.mjs';
 
 // `npm run dev:lan` sets this. Microphone access needs a secure context, and
 // http://<lan-ip>:5173 is not one -- only localhost gets a free pass. The
@@ -12,6 +13,7 @@ const useLanHttps = process.env.OCARINA_LAN === '1';
 export default defineConfig({
   plugins: [
     vue(),
+    songsManifestPlugin(),
     ...(useLanHttps ? [basicSsl()] : []),
     VitePWA({
       registerType: 'autoUpdate',
@@ -38,7 +40,9 @@ export default defineConfig({
         // only the notes this instrument's A4-F6 range needs, from abcjs's
         // default soundfont, bundled locally (~525KB) instead of left as a
         // CDN fetch, so playback works offline like everything else.
-        globPatterns: ['**/*.{js,css,html,svg,png,woff2,mp3}'],
+        // abc covers public/songs/ -- the bundled default tunes, so Song
+        // Practice's seeding still works with no network.
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2,mp3,abc}'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
       },
     }),
