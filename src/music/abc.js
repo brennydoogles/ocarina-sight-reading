@@ -91,6 +91,9 @@ function keyAccidentalTable(keySignature) {
  * @property {boolean} [chord] true for every pitch of a chord past the first
  * @property {number} duration fraction of a whole note
  * @property {number} bar 1-based bar number, for locating a problem note
+ * @property {number} startTime cumulative offset before this event, in
+ *   whole-note fractions -- what a playback engine seeks to for "play from
+ *   here" (see src/music/playback.js)
  */
 
 /**
@@ -153,6 +156,10 @@ export async function parseAbc(source) {
   const barAccidentals = new Map();
   const notes = [];
   let bar = 1;
+  // Cumulative offset, in whole-note fractions, of each event's start --
+  // what a playback engine needs to seek to "start from this note" without
+  // having to re-derive the tune's own timing math itself.
+  let startTime = 0;
 
   for (const line of tune.lines ?? []) {
     const events = line.staff?.[0]?.voices?.[0];
@@ -176,7 +183,10 @@ export async function parseAbc(source) {
       if (elem.gracenotes) features.hasGraceNotes = true;
 
       if (elem.rest) {
-        notes.push({ isRest: true, midi: null, duration: elem.duration, bar });
+        notes.push({
+          isRest: true, midi: null, duration: elem.duration, bar, startTime,
+        });
+        startTime += elem.duration;
         continue;
       }
       if (!elem.pitches || elem.pitches.length === 0) continue; // defensive; shouldn't occur
@@ -199,10 +209,14 @@ export async function parseAbc(source) {
         const midi = Math.round(exact);
         if (exact !== midi) features.hasMicrotones = true;
 
+        // Every pitch of a chord shares the chord's own start time -- they
+        // sound together, so the accumulator only advances once below,
+        // after the forEach, not once per pitch.
         notes.push({
-          isRest: false, midi, flats: delta < 0, duration: elem.duration, bar, chord: i > 0,
+          isRest: false, midi, flats: delta < 0, duration: elem.duration, bar, chord: i > 0, startTime,
         });
       });
+      startTime += elem.duration;
     }
   }
 

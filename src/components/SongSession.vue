@@ -9,8 +9,10 @@ import { useMicrophone, MIC } from '../audio/useMicrophone.js';
 import { usePitchDetection } from '../audio/usePitchDetection.js';
 import { SequenceMatcher } from '../audio/sequenceMatcher.js';
 import { MATCH } from '../audio/matcher.js';
+import { useSongPlayback } from '../audio/useSongPlayback.js';
 import { parseAbc } from '../music/abc.js';
 import { playableTargets, renderIndexForPlayable, playableIndexForBar } from '../music/songSession.js';
+import { scaleTempo, MIN_TEMPO_PERCENT, MAX_TEMPO_PERCENT } from '../music/playback.js';
 import { useSettingsStore } from '../stores/settings.js';
 import { useSessionStore } from '../stores/session.js';
 import { PRACTICE_MODE } from '../stores/practiceModes.js';
@@ -26,6 +28,7 @@ const session = useSessionStore();
 
 const mic = useMicrophone({ fftSize: 2048 });
 const detection = usePitchDetection(mic, () => settings.detectorConfig);
+const playback = useSongPlayback();
 
 /** @type {import('vue').Ref<import('../music/abc.js').ParsedTune|null>} */
 const parsed = shallowRef(null);
@@ -44,13 +47,35 @@ const finished = ref(false);
 const startBar = ref(1);
 const jumpBar = ref(1);
 
-const running = computed(() => mic.status.value === MIC.READY && detection.running.value);
+/** True while either continuous Listen or single-note step playback is the
+ *  active mode -- pitch detection is stopped for the whole stretch, not
+ *  toggled per note, so the player is never left wondering whether this
+ *  particular instant is being listened to. */
+const listening = ref(false);
+const tempoPercent = ref(100);
+/** Render-index position for Listen/step playback -- independent of
+ *  `currentRenderIndex` (the real play-along position), so previewing a
+ *  passage never advances or credits anything in the actual practice. */
+const stepIndex = ref(0);
+
+// Deliberately NOT `&& detection.running.value` -- unlike every other mode,
+// detection here gets paused mid-session for Listen/step playback (see
+// beginListenMode()), and the session itself is still very much "running"
+// while that's happening. Gating the whole practice UI on detection's own
+// running flag would hide it every time playback starts.
+const running = computed(() => mic.status.value === MIC.READY);
 const maxBar = computed(() => parsed.value?.notes.at(-1)?.bar ?? 1);
+
+/** What the staff highlights: the real play-along cursor normally, or the
+ *  Listen/step position while that's the active mode -- SongDisplay itself
+ *  doesn't need to know which is driving it. */
+const displayIndex = computed(() => (listening.value ? stepIndex.value : currentRenderIndex.value));
+const displayState = computed(() => (listening.value ? 'holding' : noteState.value));
 
 /** Bounds-safe, same reasoning as MultiNoteView.vue's `currentNote`. */
 const currentNote = computed(() => {
   const notes = parsed.value?.notes ?? [];
-  return notes[Math.min(currentRenderIndex.value, notes.length - 1)] ?? null;
+  return notes[Math.min(displayIndex.value, notes.length - 1)] ?? null;
 });
 
 onMounted(async () => {
@@ -87,6 +112,7 @@ async function begin() {
  *  tabs (see the <KeepAlive> around this whole view) should not lose your
  *  place in a multi-minute tune. */
 function stop() {
+  if (listening.value) { playback.stop(); listening.value = false; }
   detection.stop();
   advancing.value = false;
   releaseWakeLock();
@@ -166,6 +192,63 @@ function revealHint() {
   nameShown.value = true;
 }
 
+/**
+ * Pausing pitch detection for playback is not optional -- useMicrophone.js
+ * requests the stream with echo cancellation, noise suppression and AGC all
+ * disabled (they mangle a sustained tone), so the app's own output would
+ * otherwise go straight back into the detector and the matcher would chase
+ * the playback instead of the player.
+ */
+function beginListenMode() {
+  stepIndex.value = currentRenderIndex.value;
+  listening.value = true;
+  detection.stop();
+}
+
+function stopListening() {
+  playback.stop();
+  listening.value = false;
+  if (running.value) detection.start(onFrame);
+}
+
+/** Continuous playback, from wherever the practice cursor currently is. */
+async function listenFromHere() {
+  if (listening.value || !parsed.value) return;
+  beginListenMode();
+  const bpm = scaleTempo(parsed.value.bpm, tempoPercent.value);
+  await playback.playFrom(props.song.abc, {
+    audioContext: mic.context.value,
+    bpm,
+    notes: parsed.value.notes,
+    meter: parsed.value.meter ?? { num: 4, den: 4 },
+    fromIndex: stepIndex.value,
+    onEnded: stopListening,
+  });
+}
+
+/** Single-note step mode: sounds exactly the note at `stepIndex`, then
+ *  advances it for the next click -- a listening aid, not a substitute for
+ *  actually playing the note, so it never touches the real play-along
+ *  cursor or credits anything. */
+async function stepPlayback() {
+  const notes = parsed.value?.notes ?? [];
+  if (notes.length === 0) return;
+  if (!listening.value) beginListenMode();
+
+  while (stepIndex.value < notes.length && notes[stepIndex.value].isRest) stepIndex.value += 1;
+  if (stepIndex.value >= notes.length) { stopListening(); return; }
+
+  const bpm = scaleTempo(parsed.value.bpm, tempoPercent.value);
+  await playback.stepOne(props.song.abc, {
+    audioContext: mic.context.value,
+    bpm,
+    notes,
+    meter: parsed.value.meter ?? { num: 4, den: 4 },
+    index: stepIndex.value,
+    onDone: () => { stepIndex.value += 1; },
+  });
+}
+
 const noteState = computed(() => {
   if (finished.value) return 'correct';
   if (matchState.value === MATCH.CORRECT) return 'correct';
@@ -176,6 +259,7 @@ const noteState = computed(() => {
 
 const feedback = computed(() => {
   if (!running.value) return '';
+  if (listening.value) return 'Listening paused — playing back';
   if (finished.value) return 'Song complete';
   switch (matchState.value) {
     case MATCH.CORRECT: return 'Yes — that’s it';
@@ -231,8 +315,8 @@ onUnmounted(() => {
           :notes="parsed.notes"
           :key-signature="parsed.keySignature"
           :meter="parsed.meter ?? { num: 4, den: 4 }"
-          :current-index="currentRenderIndex"
-          :state="noteState"
+          :current-index="displayIndex"
+          :state="displayState"
           :show-name="nameShown"
         />
 
@@ -244,28 +328,44 @@ onUnmounted(() => {
 
         <div class="status" :class="noteState">
           <div class="hold-track"><div class="hold-fill" :style="{ width: `${holdProgress * 100}%` }" /></div>
-          <p class="feedback">{{ feedback }}</p>
+          <p class="feedback" :class="{ listening }">{{ feedback }}</p>
         </div>
 
         <Transition name="fade">
-          <div v-if="hintShown && currentNote && !currentNote.isRest && !finished" class="hint-box">
+          <div v-if="(hintShown || listening) && currentNote && !currentNote.isRest && !finished" class="hint-box">
             <FingeringChart :midi="currentNote.midi" />
           </div>
         </Transition>
 
         <div class="actions">
-          <button v-if="!hintShown && !finished" @click="revealHint">Show fingering</button>
-          <button v-if="!finished" @click="skipNote">Skip note</button>
-          <button @click="restart">Restart</button>
+          <button v-if="!hintShown && !finished" :disabled="listening" @click="revealHint">Show fingering</button>
+          <button v-if="!finished" :disabled="listening" @click="skipNote">Skip note</button>
+          <button :disabled="listening" @click="restart">Restart</button>
           <button @click="stop">Stop</button>
         </div>
 
         <div class="resume">
           <label class="bar-field">
             Jump to bar
-            <input v-model.number="jumpBar" type="number" min="1" :max="maxBar" />
+            <input v-model.number="jumpBar" type="number" min="1" :max="maxBar" :disabled="listening" />
           </label>
-          <button @click="jumpToBar(jumpBar)">Go</button>
+          <button :disabled="listening" @click="jumpToBar(jumpBar)">Go</button>
+        </div>
+
+        <div class="playback">
+          <label class="tempo-field">
+            Tempo <span class="value">{{ tempoPercent }}%</span>
+            <input
+              v-model.number="tempoPercent" type="range"
+              :min="MIN_TEMPO_PERCENT" :max="MAX_TEMPO_PERCENT" step="5"
+            />
+          </label>
+          <div class="playback-actions">
+            <button v-if="!listening" @click="listenFromHere">Listen from here</button>
+            <button v-if="!listening" @click="stepPlayback">Step one note</button>
+            <button v-else @click="stopListening">Stop listening</button>
+          </div>
+          <p v-if="playback.unavailable.value" class="error">{{ playback.errorMessage.value }}</p>
         </div>
 
         <p class="streak">
@@ -332,5 +432,16 @@ button:disabled { opacity: 0.6; cursor: default; }
 
 .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
 .resume { display: flex; align-items: center; gap: 0.6rem; }
+
+.playback {
+  width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 0.6rem;
+  padding-top: 0.85rem; border-top: 1px solid var(--line);
+}
+.tempo-field { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.8rem; color: var(--ink-dim); }
+.tempo-field .value { color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 600; }
+.tempo-field input[type='range'] { width: 100%; accent-color: var(--accent); }
+.playback-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
+.feedback.listening { color: var(--accent); }
+
 .streak { margin: 0; font-size: 0.78rem; color: var(--ink-faint); }
 </style>
