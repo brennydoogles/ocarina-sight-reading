@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { validateSong } from '../music/abc.js';
+import { validateSong, readAbcTitle } from '../music/abc.js';
 import {
   songManifestUrl, songFileUrl, filenamesNeedingSeed, initialSeededFilenames, titleFromFilename,
 } from '../music/songFiles.js';
@@ -171,7 +171,7 @@ export const useSongsStore = defineStore('songs', () => {
         continue;
       }
 
-      add({ title: result.title || titleFromFilename(filename), abc });
+      add({ title: readAbcTitle(abc) || titleFromFilename(filename), abc });
       seeded.add(filename);
       persistSeeded(seeded);
     }

@@ -1,7 +1,9 @@
 <script setup>
 import { ref, shallowRef, onMounted, onUnmounted, watch } from 'vue';
 import { useSongsStore } from '../stores/songs.js';
-import { validateSong, transposeAbc, loadAbcjs } from '../music/abc.js';
+import {
+  validateSong, transposeAbc, loadAbcjs, readAbcTitle, writeAbcTitle,
+} from '../music/abc.js';
 import SongSession from './SongSession.vue';
 
 const songs = useSongsStore();
@@ -42,6 +44,18 @@ watch(abc, () => {
   validateTimer = setTimeout(runValidation, 250);
 });
 
+// Title <-> ABC's T: line, kept in sync in both directions. Each side only
+// ever writes the other when it would actually change something, which is
+// what stops an edit on one side from bouncing straight back off the other.
+watch(abc, () => {
+  const fromAbc = readAbcTitle(abc.value);
+  if (fromAbc !== null && fromAbc !== title.value) title.value = fromAbc;
+});
+watch(title, () => {
+  const fromAbc = readAbcTitle(abc.value) ?? '';
+  if (fromAbc !== title.value) abc.value = writeAbcTitle(abc.value, title.value);
+});
+
 async function runValidation() {
   const token = (validationToken += 1);
   const result = await validateSong(abc.value);
@@ -60,7 +74,10 @@ function startAdd() {
 
 function startEdit(song) {
   editingId.value = song.id;
-  title.value = song.title;
+  // The ABC's own T: line wins over the stored title for a song saved
+  // before this sync existed, so the two are consistent from the moment
+  // the form opens rather than however the watchers above happen to settle.
+  title.value = readAbcTitle(song.abc) ?? song.title;
   abc.value = song.abc;
   mode.value = 'edit';
   runValidation();

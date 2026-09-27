@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { parseAbc, validateSong, transposeAbc } from '../src/music/abc.js';
+import {
+  parseAbc, validateSong, transposeAbc, readAbcTitle, writeAbcTitle,
+} from '../src/music/abc.js';
 import { INSTRUMENT_LOW, INSTRUMENT_HIGH } from '../src/music/notes.js';
 
 /** Builds a minimal single-line ABC tune from a body of notes. */
@@ -238,5 +240,64 @@ describe('transposeAbc', () => {
     const shifted = await transposeAbc(low, transposition.semitones);
     const result = await validateSong(shifted);
     expect(result.valid).toBe(true);
+  });
+});
+
+describe('readAbcTitle', () => {
+  it('reads the first T: line', () => {
+    expect(readAbcTitle('X:1\nT:Ode to Joy\nK:C\nC |]\n')).toBe('Ode to Joy');
+  });
+
+  it('ignores later T: lines -- those are subtitles', () => {
+    expect(readAbcTitle('X:1\nT:Main\nT:Subtitle\nK:C\nC |]\n')).toBe('Main');
+  });
+
+  it('returns null when there is no T: line at all', () => {
+    expect(readAbcTitle('X:1\nK:C\nC |]\n')).toBeNull();
+  });
+
+  it('returns null for an empty or undefined source', () => {
+    expect(readAbcTitle('')).toBeNull();
+    expect(readAbcTitle(undefined)).toBeNull();
+  });
+
+  it('trims whitespace around the value', () => {
+    expect(readAbcTitle('X:1\nT:  Ode to Joy  \nK:C\nC |]\n')).toBe('Ode to Joy');
+  });
+
+  it('returns an empty string for a T: line with no value, not null', () => {
+    expect(readAbcTitle('X:1\nT:\nK:C\nC |]\n')).toBe('');
+  });
+});
+
+describe('writeAbcTitle', () => {
+  it('replaces the first T: line, preserving everything else byte-for-byte', () => {
+    const source = 'X:1\nT:Old\nT:Subtitle\nM:4/4\nK:C\nC D |]\n';
+    expect(writeAbcTitle(source, 'New')).toBe('X:1\nT:New\nT:Subtitle\nM:4/4\nK:C\nC D |]\n');
+  });
+
+  it('inserts a T: line right after X: when there is none', () => {
+    const source = 'X:1\nK:C\nC D |]\n';
+    expect(writeAbcTitle(source, 'New')).toBe('X:1\nT:New\nK:C\nC D |]\n');
+  });
+
+  it('inserts at the very top when there is neither T: nor X:', () => {
+    const source = 'K:C\nC D |]\n';
+    expect(writeAbcTitle(source, 'New')).toBe('T:New\nK:C\nC D |]\n');
+  });
+
+  it('produces just the T: line for otherwise-empty source', () => {
+    expect(writeAbcTitle('', 'New')).toBe('T:New');
+  });
+
+  it('round-trips with readAbcTitle', () => {
+    const source = 'X:1\nK:C\nC D |]\n';
+    const written = writeAbcTitle(source, 'Ode to Joy');
+    expect(readAbcTitle(written)).toBe('Ode to Joy');
+  });
+
+  it('round-trips an empty title too', () => {
+    const written = writeAbcTitle('X:1\nT:Something\nK:C\nC |]\n', '');
+    expect(readAbcTitle(written)).toBe('');
   });
 });
