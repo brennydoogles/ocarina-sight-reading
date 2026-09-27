@@ -192,6 +192,7 @@ src/
 │   ├── fingerings.js       the 12-hole Alto C hole-state table (naturals)
 │   ├── fingeringFiles.js   note -> diagram filename
 │   ├── fingeringAssets.js  fetches and inlines the diagram files
+│   ├── songFiles.js        default-song filenames, URLs, seeding logic
 │   └── exercise.js         exercise generation
 ├── audio/
 │   ├── detector.js     pure pitch analysis (unit-tested)
@@ -279,6 +280,28 @@ re-derivable from those two sources if chromatic practice is ever wanted.
 
 > Makers do vary. Compare against the chart that came with your instrument
 > before trusting it.
+
+## Adding default songs
+
+Song Practice's library seeds itself from **`public/songs/`** -- one tune per
+`.abc` file, named in snake_case (`marys_little_lamb.abc`, `ode_to_joy.abc`).
+Drop a new file in there and it appears in every player's library on their
+next load, with no code change.
+
+- The title shown is the tune's own `T:` field, not the filename. A file with
+  no `T:` falls back to the filename humanised (`ode_to_joy` -> "Ode To Joy").
+- The file must fit the instrument's **A4-F6** range, and be a single
+  melodic line (no chords, extra voices, or quarter-tones), or it's skipped
+  with a console warning rather than breaking anyone's library. Paste the
+  tune into the app's **Add a song** form first (Song Practice -> Add a
+  song) to see exactly what it objects to, if anything.
+- `npm run dev` picks up a new file immediately -- a small Vite plugin
+  (`vite-songs-plugin.mjs`) rescans `public/songs/` and regenerates its
+  manifest (`public/songs/index.json`, gitignored -- it's generated, never
+  hand-edited) whenever a `.abc` file is added or removed.
+- Once a copy has been seeded into a player's library it's an ordinary song:
+  editable and deletable like any other, and deleting it does not bring it
+  back on a later load.
 
 ## Notes on the browser
 

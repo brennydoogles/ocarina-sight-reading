@@ -1,8 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { useSongsStore } from '../src/stores/songs.js';
+import { MIGRATED_FILENAMES } from '../src/music/songFiles.js';
 
 const STORAGE_KEY = 'ocarina.songs.v1';
+const SEEDED_KEY = 'ocarina.songs.seeded.v1';
 
 /** A minimal in-memory Storage stand-in -- see test/session.test.js. */
 function makeStorage() {
@@ -13,6 +15,25 @@ function makeStorage() {
     removeItem: (key) => data.delete(key),
   };
 }
+
+/**
+ * A fetch stand-in serving `files` (filename -> ABC text) at whatever URL
+ * `songManifestUrl`/`songFileUrl` build, without caring about the base.
+ */
+function makeFetch(files) {
+  return async (url) => {
+    if (url.endsWith('/index.json')) return { ok: true, json: async () => Object.keys(files) };
+    const filename = url.split('/').pop();
+    if (!(filename in files)) return { ok: false };
+    return { ok: true, text: async () => files[filename] };
+  };
+}
+
+// Lowercase c/d/e/f is C5/D5/E5/F5 -- comfortably inside A4-F6.
+const VALID_ABC = 'X:1\nT:Test Tune\nL:1/4\nK:C\nc d e f |]\n';
+const NO_TITLE_ABC = 'X:1\nL:1/4\nK:C\nc d e |]\n';
+// Two octaves below middle C -- well outside the instrument's A4-F6 range.
+const INVALID_ABC = 'X:1\nT:Bad Tune\nL:1/4\nK:C\nC,, |]\n';
 
 let storage;
 
@@ -25,18 +46,17 @@ beforeEach(() => {
 });
 
 describe('first run', () => {
-  it('seeds a few example songs when nothing has ever been saved', () => {
+  it('starts empty when nothing has ever been saved', () => {
     const songs = useSongsStore();
-    expect(songs.songs.length).toBeGreaterThanOrEqual(2);
-    expect(songs.songs.every((s) => typeof s.abc === 'string' && s.abc.length > 0)).toBe(true);
+    expect(songs.songs).toEqual([]);
   });
 
-  it('persists the seeded examples immediately', () => {
+  it('does not persist anything until a mutation happens', () => {
     useSongsStore();
-    expect(storage.getItem(STORAGE_KEY)).not.toBeNull();
+    expect(storage.getItem(STORAGE_KEY)).toBeNull();
   });
 
-  it('does not reseed a library the player has deliberately emptied', () => {
+  it('leaves a deliberately emptied library empty', () => {
     storage.setItem(STORAGE_KEY, '[]');
     const songs = useSongsStore();
     expect(songs.songs).toEqual([]);
@@ -159,5 +179,118 @@ describe('corrupt or unavailable storage', () => {
     delete globalThis.localStorage;
     const songs = useSongsStore();
     expect(() => songs.add({ title: 'x', abc: 'X:1\nK:C\nC|]\n' })).not.toThrow();
+  });
+});
+
+describe('seedFromFolder', () => {
+  it('adds every manifest file not yet seeded, titled from T:', async () => {
+    const songs = useSongsStore();
+    await songs.seedFromFolder({ fetchImpl: makeFetch({ 'a.abc': VALID_ABC }) });
+    expect(songs.songs.some((s) => s.title === 'Test Tune')).toBe(true);
+  });
+
+  it('falls back to a humanised filename when the tune has no T: field', async () => {
+    const songs = useSongsStore();
+    await songs.seedFromFolder({ fetchImpl: makeFetch({ 'no_title.abc': NO_TITLE_ABC }) });
+    expect(songs.songs.some((s) => s.title === 'No Title')).toBe(true);
+  });
+
+  it('marks a file seeded so a later call does not add it twice', async () => {
+    const songs = useSongsStore();
+    const fetchImpl = makeFetch({ 'a.abc': VALID_ABC });
+    await songs.seedFromFolder({ fetchImpl });
+    const countAfterFirst = songs.songs.length;
+
+    await songs.seedFromFolder({ fetchImpl });
+    expect(songs.songs).toHaveLength(countAfterFirst);
+  });
+
+  it('does not bring back a seeded song the player deleted', async () => {
+    const songs = useSongsStore();
+    const fetchImpl = makeFetch({ 'a.abc': VALID_ABC });
+    await songs.seedFromFolder({ fetchImpl });
+
+    const added = songs.songs.find((s) => s.title === 'Test Tune');
+    songs.remove(added.id);
+
+    await songs.seedFromFolder({ fetchImpl });
+    expect(songs.songs.some((s) => s.title === 'Test Tune')).toBe(false);
+  });
+
+  it('skips a file that fails validation, warns, and does not mark it seeded', async () => {
+    const songs = useSongsStore();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await songs.seedFromFolder({ fetchImpl: makeFetch({ 'bad.abc': INVALID_ABC }) });
+    expect(songs.songs).toHaveLength(0);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('bad.abc'));
+
+    // Not marked seeded -- "fixing" the file (a later load serving a valid
+    // tune under the same name) makes it appear.
+    await songs.seedFromFolder({ fetchImpl: makeFetch({ 'bad.abc': VALID_ABC }) });
+    expect(songs.songs.some((s) => s.title === 'Test Tune')).toBe(true);
+
+    warn.mockRestore();
+  });
+
+  it('leaves the library untouched when the manifest fetch fails', async () => {
+    const songs = useSongsStore();
+    songs.add({ title: 'Mine', abc: 'X:1\nK:C\nC|]\n' });
+
+    const fetchImpl = async () => { throw new Error('offline'); };
+    await expect(songs.seedFromFolder({ fetchImpl })).resolves.toBeUndefined();
+    expect(songs.songs).toHaveLength(1);
+  });
+
+  it('leaves the library untouched when the manifest response is not ok', async () => {
+    const songs = useSongsStore();
+    const fetchImpl = async () => ({ ok: false });
+    await songs.seedFromFolder({ fetchImpl });
+    expect(songs.songs).toEqual([]);
+  });
+
+  it('skips just the one file that fails to fetch, and still tries the rest', async () => {
+    const songs = useSongsStore();
+    const fetchImpl = async (url) => {
+      if (url.endsWith('/index.json')) return { ok: true, json: async () => ['missing.abc', 'a.abc'] };
+      if (url.endsWith('/a.abc')) return { ok: true, text: async () => VALID_ABC };
+      return { ok: false };
+    };
+    await songs.seedFromFolder({ fetchImpl });
+    expect(songs.songs.some((s) => s.title === 'Test Tune')).toBe(true);
+    expect(songs.songs).toHaveLength(1);
+  });
+
+  describe('migration for a pre-existing library', () => {
+    it('marks the migrated filenames seeded without adding them', async () => {
+      storage.setItem(STORAGE_KEY, JSON.stringify([
+        { id: '1', title: 'Old Mary', abc: 'X:1\nK:C\nC|]\n', addedAt: 1 },
+      ]));
+      const songs = useSongsStore();
+      const [migratedFilename] = MIGRATED_FILENAMES;
+      const fetchImpl = makeFetch({
+        [migratedFilename]: 'X:1\nT:Migrated Mary\nL:1/4\nK:C\nc d e |]\n',
+        'new_song.abc': 'X:1\nT:New Song\nL:1/4\nK:C\nc d e |]\n',
+      });
+
+      await songs.seedFromFolder({ fetchImpl });
+
+      expect(songs.songs.some((s) => s.title === 'Migrated Mary')).toBe(false);
+      expect(songs.songs.some((s) => s.title === 'New Song')).toBe(true);
+      expect(songs.songs.some((s) => s.title === 'Old Mary')).toBe(true);
+
+      const seeded = JSON.parse(storage.getItem(SEEDED_KEY));
+      expect(seeded).toEqual(expect.arrayContaining(MIGRATED_FILENAMES));
+    });
+
+    it('adds the migrated-named files normally for a brand-new player', async () => {
+      const songs = useSongsStore(); // no pre-existing library
+      const [migratedFilename] = MIGRATED_FILENAMES;
+      const fetchImpl = makeFetch({ [migratedFilename]: 'X:1\nT:Migrated Mary\nL:1/4\nK:C\nc d e |]\n' });
+
+      await songs.seedFromFolder({ fetchImpl });
+
+      expect(songs.songs.some((s) => s.title === 'Migrated Mary')).toBe(true);
+    });
   });
 });

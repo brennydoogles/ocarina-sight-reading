@@ -1,40 +1,24 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
+import { validateSong } from '../music/abc.js';
+import {
+  songManifestUrl, songFileUrl, filenamesNeedingSeed, initialSeededFilenames, titleFromFilename,
+} from '../music/songFiles.js';
 
 const STORAGE_KEY = 'ocarina.songs.v1';
-
-/**
- * Two or three short public-domain tunes, so Song Practice isn't an empty
- * library on first open. All three sit in C5-A5 -- comfortably inside the
- * instrument's A4-F6 -- and use nothing `validateSong` would object to.
- */
-const EXAMPLE_SONGS = [
-  {
-    title: 'Mary Had a Little Lamb',
-    abc: 'X:1\nT:Mary Had a Little Lamb\nM:4/4\nL:1/4\nQ:1/4=100\nK:C\n'
-      + 'e d c d | e e e2 | d d d2 | e g g2 |\n'
-      + 'e d c d | e e e e | d d e d | c4 |]\n',
-  },
-  {
-    title: 'Twinkle, Twinkle, Little Star',
-    abc: 'X:1\nT:Twinkle, Twinkle, Little Star\nM:4/4\nL:1/4\nQ:1/4=100\nK:C\n'
-      + 'c c g g | a a g2 | f f e e | d d c2 |\n'
-      + 'g g f f | e e d2 | g g f f | e e d2 |\n'
-      + 'c c g g | a a g2 | f f e e | d d c2 |]\n',
-  },
-  {
-    title: "Ode to Joy",
-    abc: "X:1\nT:Ode to Joy\nM:4/4\nL:1/4\nQ:1/4=100\nK:C\n"
-      + 'e e f g | g f e d | c c d e | e2 d2 |\n'
-      + 'e e f g | g f e d | c c d e | d2 c2 |]\n',
-  },
-];
+const SEEDED_KEY = 'ocarina.songs.seeded.v1';
 
 /**
  * The song library: user-entered ABC tunes, persisted to `localStorage` since
  * this app has no backend. `add`/`update` do not validate -- that is
  * `validateSong`'s job (see src/music/abc.js) and the UI's to enforce before
  * ever calling these; this store just stores what it's given.
+ *
+ * The library starts empty (or however it was left) on its own -- it is
+ * `seedFromFolder` that copies in the bundled default songs from
+ * `public/songs/`. That runs separately, once per app load (see
+ * `main.js`), rather than from this store's own setup, so merely
+ * instantiating the store -- as every test does -- never fires a fetch.
  */
 export const useSongsStore = defineStore('songs', () => {
   /** @type {import('vue').Ref<{id: string, title: string, abc: string, addedAt: number}[]>} */
@@ -97,15 +81,7 @@ export const useSongsStore = defineStore('songs', () => {
   function load() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw === null) {
-        // A true first run -- nothing has ever been saved here. A library
-        // the player has deliberately emptied persists as "[]", which is
-        // NOT this case, so deleting every song does not bring the
-        // examples back.
-        songs.value = EXAMPLE_SONGS.map((s) => ({ ...s, id: makeId(), addedAt: Date.now() }));
-        persist();
-        return;
-      }
+      if (raw === null) return; // a true first run -- nothing has ever been saved here
       const saved = JSON.parse(raw);
       if (Array.isArray(saved)) songs.value = saved;
     } catch {
@@ -121,9 +97,89 @@ export const useSongsStore = defineStore('songs', () => {
     }
   }
 
+  /** @returns {string[]|null} the saved seeded-filenames list, or null if none has ever been saved (or it's unreadable) */
+  function loadSeededRaw() {
+    try {
+      const raw = localStorage.getItem(SEEDED_KEY);
+      if (raw === null) return null;
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** @param {Set<string>} seeded */
+  function persistSeeded(seeded) {
+    try {
+      localStorage.setItem(SEEDED_KEY, JSON.stringify([...seeded]));
+    } catch {
+      // Private browsing, quota, etc. -- seeding just runs again next load.
+    }
+  }
+
+  function libraryAlreadyExists() {
+    try {
+      return localStorage.getItem(STORAGE_KEY) !== null;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Copies in any bundled default song (`public/songs/*.abc`) not yet
+   * seeded: fetches the manifest, fetches and validates each new file, and
+   * adds the valid ones as ordinary songs -- editable and deletable from
+   * then on, and never re-added once deleted, since a filename is marked
+   * seeded the moment it's added.
+   *
+   * Best-effort and never throws: offline, a missing manifest, or a single
+   * file failing to fetch or validate just leaves that part of the library
+   * as-is for next time. An invalid file is skipped with a console warning
+   * naming it and its first issue, and is NOT marked seeded, so fixing the
+   * file makes it appear next load.
+   * @param {{ fetchImpl?: typeof fetch, validate?: typeof validateSong }} [deps]
+   *   injected for testing; default to the real `fetch` and `validateSong`
+   */
+  async function seedFromFolder({ fetchImpl = fetch, validate = validateSong } = {}) {
+    let manifest;
+    try {
+      const res = await fetchImpl(songManifestUrl());
+      if (!res.ok) return;
+      manifest = await res.json();
+    } catch {
+      return; // offline, or the manifest isn't there yet -- try again next load
+    }
+    if (!Array.isArray(manifest)) return;
+
+    const seeded = new Set(loadSeededRaw() ?? initialSeededFilenames(libraryAlreadyExists()));
+    persistSeeded(seeded); // durable even if nothing below needs seeding this run
+
+    for (const filename of filenamesNeedingSeed(manifest, seeded)) {
+      let abc;
+      try {
+        const res = await fetchImpl(songFileUrl(filename));
+        if (!res.ok) continue;
+        abc = await res.text();
+      } catch {
+        continue; // this file specifically failed; still try the rest
+      }
+
+      const result = await validate(abc);
+      if (!result.valid) {
+        console.warn(`Skipping bundled song "${filename}": ${result.issues[0]?.message ?? 'failed to validate'}`);
+        continue;
+      }
+
+      add({ title: result.title || titleFromFilename(filename), abc });
+      seeded.add(filename);
+      persistSeeded(seeded);
+    }
+  }
+
   load();
 
   return {
-    songs, add, update, remove, exportJson, importJson,
+    songs, add, update, remove, exportJson, importJson, seedFromFolder,
   };
 });
