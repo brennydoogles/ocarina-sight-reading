@@ -62,6 +62,36 @@ function plainWarning(warning) {
   return warning.replace(/<[^>]*>/g, '');
 }
 
+/**
+ * Reads the tune's title straight off its first `T:` header line -- plain
+ * text, no `abcjs` parse needed, so an editor can mirror it into a Title
+ * field while abcjs is still downloading. A tune may have further `T:`
+ * lines after the first (ABC subtitles); only the first one is the title.
+ * @param {string} source
+ * @returns {string|null} the trimmed value, or null if there is no `T:` line at all
+ */
+export function readAbcTitle(source) {
+  const match = (source ?? '').match(/^T:(.*)$/m);
+  return match ? match[1].trim() : null;
+}
+
+/**
+ * Rewrites the tune's title: replaces the first `T:` line's value in place,
+ * or -- if the tune has none -- inserts a new one right after `X:`, or at
+ * the very top if there's no `X:` either. A subtitle `T:` line further down
+ * and everything else in `source` is left byte-for-byte alone.
+ * @param {string} source
+ * @param {string} title
+ * @returns {string}
+ */
+export function writeAbcTitle(source, title) {
+  const text = source ?? '';
+  const line = `T:${title ?? ''}`;
+  if (/^T:.*$/m.test(text)) return text.replace(/^T:.*$/m, line);
+  if (/^X:.*$/m.test(text)) return text.replace(/^(X:.*)$/m, `$1\n${line}`);
+  return text ? `${line}\n${text}` : line;
+}
+
 function extractNote(pitch) {
   const n = pitch % 7;
   return n < 0 ? n + 7 : n;
