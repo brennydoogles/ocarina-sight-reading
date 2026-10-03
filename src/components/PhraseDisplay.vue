@@ -1,11 +1,13 @@
 <script setup>
-import { ref, shallowRef, watch, onMounted } from 'vue';
+import { ref, shallowRef, computed, watch, onMounted } from 'vue';
 // Same bundled-fonts entry as StaffDisplay.vue, for the same reason: Bravura +
 // Academico inlined as base64 so the PWA can draw a staff offline. Do not
 // switch to the default `vexflow` entry, which fetches fonts from a CDN.
 import VexFlow from 'vexflow/bravura';
 import { toVexKey, noteName, isNatural } from '../music/pitch.js';
 import { QUARTERS_PER_DURATION } from '../music/rhythm.js';
+import { DEFAULT_WIDTHS, packLines, justifyLine } from '../music/staffLayout.js';
+import { useElementSize } from './useElementSize.js';
 
 const props = defineProps({
   /** @type {import('vue').PropType<import('../music/notes.js').Note[]>} */
@@ -22,14 +24,21 @@ const props = defineProps({
 const { Renderer, Stave, StaveNote, Voice, Formatter, Accidental, Barline } = VexFlow;
 
 /** Vertical room one stave (with ledger lines either side) needs. Matches
- *  StaffDisplay.vue's single-stave budget, so a one-bar phrase is the same
+ *  StaffDisplay.vue's single-stave budget, so a one-line phrase is the same
  *  height as the single-note view. */
 const ROW_HEIGHT = 150;
 const TOP_MARGIN = 70;
-const WIDTH = 320;
+/** On-screen pixels per SVG unit -- see SongDisplay.vue. */
+const NOTE_SCALE = 1;
+const STAVE_MARGIN = 20; // 10 units either side of each line
+/** No key signature here (drills are in C), so a line opens with just the clef. */
+const PHRASE_WIDTHS = { ...DEFAULT_WIDTHS, clef: 45 };
 
 const host = ref(null);
 const fontsReady = shallowRef(false);
+const hostSize = useElementSize(host);
+/** Drawing width in SVG units; 0 until the host has been laid out. */
+const width = computed(() => Math.floor(hostSize.width.value / NOTE_SCALE));
 
 onMounted(async () => {
   try {
@@ -42,7 +51,7 @@ onMounted(async () => {
 // flush: 'post', for the same reason as StaffDisplay.vue: draw() writes to
 // the DOM imperatively, outside Vue's render, and a pre-flush watcher would
 // leave the staff a frame behind whatever fingering/status UI sits beside it.
-watch(() => [props.notes, props.currentIndex, props.state], draw, { flush: 'post' });
+watch(() => [props.notes, props.currentIndex, props.state, width.value], draw, { flush: 'post' });
 
 /** Splits `notes` into bars by accumulating duration until a bar's worth of
  *  beats is reached. `generateRhythm` guarantees bars sum exactly, so this
@@ -51,86 +60,100 @@ watch(() => [props.notes, props.currentIndex, props.state], draw, { flush: 'post
  *  rather than silently dropping notes. */
 function groupIntoBars(notes, beatsPerBar) {
   const bars = [];
-  let bar = [];
+  let current = null;
   let beats = 0;
-  for (const note of notes) {
-    bar.push(note);
+  notes.forEach((note, i) => {
+    if (!current) {
+      current = { notes: [], startIndex: i, index: bars.length };
+      bars.push(current);
+    }
+    current.notes.push(note);
     beats += QUARTERS_PER_DURATION[note.duration] ?? 1;
     if (beats >= beatsPerBar - 1e-9) {
-      bars.push(bar);
-      bar = [];
+      current = null;
       beats = 0;
     }
-  }
-  if (bar.length > 0) bars.push(bar);
+  });
   return bars;
 }
 
 function draw() {
-  if (!fontsReady.value || !host.value) return;
+  // A zero width means the host is detached (KeepAlive) or not laid out yet:
+  // keep whatever was last drawn rather than redrawing at a bogus size.
+  if (!fontsReady.value || !host.value || width.value === 0) return;
   host.value.innerHTML = '';
   if (props.notes.length === 0) return;
 
+  const drawWidth = width.value;
+  const lineWidth = drawWidth - STAVE_MARGIN;
   const bars = groupIntoBars(props.notes, props.beatsPerBar);
-  const height = TOP_MARGIN + bars.length * ROW_HEIGHT;
+  const lines = packLines(bars, lineWidth, PHRASE_WIDTHS);
+  const height = TOP_MARGIN + lines.length * ROW_HEIGHT;
 
   const renderer = new Renderer(host.value, Renderer.Backends.SVG);
-  renderer.resize(WIDTH, height);
+  renderer.resize(drawWidth, height);
   const ctx = renderer.getContext();
 
   const ink = getComputedStyle(host.value).getPropertyValue('--staff-ink').trim() || '#000';
   ctx.setFillStyle(ink);
   ctx.setStrokeStyle(ink);
 
-  const colourFor = {
+  const colorFor = {
     correct: getVar('--note-correct', '#3fb950'),
     wrong: getVar('--note-wrong', '#d98a3a'),
     holding: getVar('--note-holding', '#4a9eff'),
   };
   /** Every note already played correctly reads as done, in the same green
    *  the current note gets on success -- the phrase so far, at a glance. */
-  const doneColour = colourFor.correct;
+  const doneColor = colorFor.correct;
 
-  let globalIndex = 0;
-  bars.forEach((bar, barIndex) => {
-    const y = TOP_MARGIN + barIndex * ROW_HEIGHT;
-    const stave = new Stave(10, y, WIDTH - 20);
-    stave.addClef('treble');
-    if (barIndex === 0) stave.addTimeSignature(`${props.beatsPerBar}/4`);
-    if (barIndex === bars.length - 1) stave.setEndBarType(Barline.type.END);
-    stave.setContext(ctx).draw();
-
-    const staveNotes = bar.map((note) => {
-      const i = globalIndex;
-      globalIndex += 1;
-
-      const staveNote = new StaveNote({
-        keys: [toVexKey(note.midi)],
-        duration: note.duration,
-        clef: 'treble',
-      });
-      if (!isNatural(note.midi)) staveNote.addModifier(new Accidental('#'), 0);
-
-      const colour = i === props.currentIndex ? colourFor[props.state]
-        : i < props.currentIndex ? doneColour
-          : null;
-      if (colour) staveNote.setStyle({ fillStyle: colour, strokeStyle: colour });
-      return staveNote;
+  lines.forEach((line, li) => {
+    const y = TOP_MARGIN + li * ROW_HEIGHT;
+    let x = STAVE_MARGIN / 2;
+    const barWidths = justifyLine(line, lineWidth, {
+      isLastLine: lines.length > 1 && li === lines.length - 1,
+      widths: PHRASE_WIDTHS,
     });
 
-    const voice = new Voice({ numBeats: props.beatsPerBar, beatValue: 4 });
-    // Defensive, not load-bearing: generateRhythm guarantees an exact fit,
-    // but a mismatched bar should render loosely rather than throw.
-    voice.setStrict(false);
-    voice.addTickables(staveNotes);
-    const fit = stave.getNoteEndX() - stave.getNoteStartX();
-    new Formatter().joinVoices([voice]).format([voice], fit - 20);
-    voice.draw(ctx, stave);
+    line.forEach((bar, bi) => {
+      const stave = new Stave(x, y, barWidths[bi]);
+      if (bi === 0) stave.addClef('treble');
+      if (bar.index === 0) stave.addTimeSignature(`${props.beatsPerBar}/4`);
+      if (bar.index === bars.length - 1) stave.setEndBarType(Barline.type.END);
+      stave.setContext(ctx).draw();
+
+      const staveNotes = bar.notes.map((note, ni) => {
+        const i = bar.startIndex + ni;
+        const staveNote = new StaveNote({
+          keys: [toVexKey(note.midi)],
+          duration: note.duration,
+          clef: 'treble',
+        });
+        if (!isNatural(note.midi)) staveNote.addModifier(new Accidental('#'), 0);
+
+        const color = i === props.currentIndex ? colorFor[props.state]
+          : i < props.currentIndex ? doneColor
+            : null;
+        if (color) staveNote.setStyle({ fillStyle: color, strokeStyle: color });
+        return staveNote;
+      });
+
+      const voice = new Voice({ numBeats: props.beatsPerBar, beatValue: 4 });
+      // Defensive, not load-bearing: generateRhythm guarantees an exact fit,
+      // but a mismatched bar should render loosely rather than throw.
+      voice.setStrict(false);
+      voice.addTickables(staveNotes);
+      const fit = stave.getNoteEndX() - stave.getNoteStartX();
+      new Formatter().joinVoices([voice]).format([voice], fit - 20);
+      voice.draw(ctx, stave);
+
+      x += barWidths[bi];
+    });
   });
 
   const svg = host.value.querySelector('svg');
   if (svg) {
-    svg.setAttribute('viewBox', `0 0 ${WIDTH} ${height}`);
+    svg.setAttribute('viewBox', `0 0 ${drawWidth} ${height}`);
     svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
     svg.removeAttribute('width');
     svg.removeAttribute('height');
@@ -168,7 +191,6 @@ function getVar(name, fallback) {
 <style scoped>
 .staff-block {
   width: 100%;
-  max-width: 340px;
   margin: 0 auto;
 }
 .staff {

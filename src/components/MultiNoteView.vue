@@ -1,8 +1,8 @@
 <script setup>
 import { ref, computed, shallowRef, onUnmounted, watch } from 'vue';
 import PhraseDisplay from './PhraseDisplay.vue';
-import FingeringChart from './FingeringChart.vue';
-import PitchMeter from './PitchMeter.vue';
+import SessionLayout from './SessionLayout.vue';
+import PracticeSidebar from './PracticeSidebar.vue';
 import { useMicrophone, MIC } from '../audio/useMicrophone.js';
 import { usePitchDetection } from '../audio/usePitchDetection.js';
 import { useMetronome } from '../audio/useMetronome.js';
@@ -189,8 +189,40 @@ onUnmounted(stop);
 </script>
 
 <template>
-  <section class="multi">
-    <div class="options">
+  <SessionLayout>
+    <template #music>
+      <!-- Pre-flight: microphone permission and failure states. -->
+      <div v-if="!running" class="gate">
+        <template v-if="mic.status.value === MIC.DENIED || mic.status.value === MIC.UNSUPPORTED || mic.status.value === MIC.ERROR">
+          <p class="error">{{ mic.error.value }}</p>
+          <button class="primary" @click="begin">Try again</button>
+        </template>
+        <template v-else>
+          <p class="blurb">
+            A short phrase appears on the staff. Play it one note at a time — the
+            cursor moves on as soon as you land each note, in your own time.
+          </p>
+          <button class="primary" :disabled="mic.status.value === MIC.REQUESTING" @click="begin">
+            {{ mic.status.value === MIC.REQUESTING ? 'Waiting for microphone…' : 'Start practicing' }}
+          </button>
+          <p v-if="pool.length === 0" class="error">
+            The practice range contains no notes. Widen it in Settings.
+          </p>
+        </template>
+      </div>
+
+      <template v-else-if="phrase.length > 0">
+        <p class="progress">Note {{ Math.min(currentIndex + 1, phrase.length) }} of {{ phrase.length }}</p>
+        <PhraseDisplay
+          :notes="phrase"
+          :current-index="currentIndex"
+          :state="noteState"
+          :show-name="nameShown"
+        />
+      </template>
+    </template>
+
+    <template #toolbar>
       <label class="toggle">
         <input type="checkbox" v-model="options.includeAccidentals.value" />
         Include sharps
@@ -199,90 +231,54 @@ onUnmounted(stop);
         <input type="checkbox" v-model="options.rhythmEnabled.value" />
         Rhythm (click track)
       </label>
-      <template v-if="options.rhythmEnabled.value">
-        <label class="range-row" for="multi-bpm">
-          Tempo <span class="value">{{ options.bpm.value }} BPM</span>
-        </label>
+      <label v-if="options.rhythmEnabled.value" class="range-field" for="multi-bpm">
+        Tempo
         <input id="multi-bpm" v-model.number="options.bpm.value" type="range" min="40" max="160" step="2" />
-      </template>
-      <label class="range-row" for="multi-length">
-        Phrase length <span class="value">{{ options.phraseLength.value }} notes</span>
+        <span class="value">{{ options.bpm.value }} BPM</span>
       </label>
-      <input id="multi-length" v-model.number="options.phraseLength.value" type="range" min="4" max="16" step="1" />
-    </div>
+      <label class="range-field" for="multi-length">
+        Phrase length
+        <input id="multi-length" v-model.number="options.phraseLength.value" type="range" min="4" max="16" step="1" />
+        <span class="value">{{ options.phraseLength.value }} notes</span>
+      </label>
+    </template>
 
-    <!-- Pre-flight: microphone permission and failure states. -->
-    <div v-if="!running" class="gate">
-      <template v-if="mic.status.value === MIC.DENIED || mic.status.value === MIC.UNSUPPORTED || mic.status.value === MIC.ERROR">
-        <p class="error">{{ mic.error.value }}</p>
-        <button class="primary" @click="begin">Try again</button>
-      </template>
-      <template v-else>
-        <p class="blurb">
-          A short phrase appears on the staff. Play it one note at a time — the
-          cursor moves on as soon as you land each note, in your own time.
-        </p>
-        <button class="primary" :disabled="mic.status.value === MIC.REQUESTING" @click="begin">
-          {{ mic.status.value === MIC.REQUESTING ? 'Waiting for microphone…' : 'Start practising' }}
-        </button>
-        <p v-if="pool.length === 0" class="error">
-          The practice range contains no notes. Widen it in Settings.
-        </p>
-      </template>
-    </div>
-
-    <template v-else-if="phrase.length > 0">
-      <p class="progress">Note {{ Math.min(currentIndex + 1, phrase.length) }} of {{ phrase.length }}</p>
-
-      <PhraseDisplay
-        :notes="phrase"
-        :current-index="currentIndex"
-        :state="noteState"
-        :show-name="nameShown"
-      />
-
-      <PitchMeter
+    <template #sidebar>
+      <PracticeSidebar
+        :hint-midi="currentNote?.midi ?? null"
+        :hint-shown="running && hintShown"
+        :can-reveal="running && phrase.length > 0"
         :reading="detection.reading.value"
         :cents="liveCents"
         :tolerance="settings.toleranceCents"
-      />
+        :hold-progress="holdProgress"
+        :note-state="noteState"
+        :feedback="feedback"
+        @reveal="revealHint"
+      >
+        <template v-if="running && phrase.length > 0">
+          <button @click="skip">Skip</button>
+          <button @click="stop">Stop</button>
+        </template>
 
-      <div class="status" :class="noteState">
-        <div class="hold-track"><div class="hold-fill" :style="{ width: `${holdProgress * 100}%` }" /></div>
-        <p class="feedback">{{ feedback }}</p>
-      </div>
-
-      <Transition name="fade">
-        <div v-if="hintShown && currentNote" class="hint-box">
-          <FingeringChart :midi="currentNote.midi" />
-        </div>
-      </Transition>
-
-      <div class="actions">
-        <button v-if="!hintShown" @click="revealHint">Show fingering</button>
-        <button @click="skip">Skip</button>
-        <button @click="stop">Stop</button>
-      </div>
-
-      <p class="streak">
-        Streak <strong>{{ session.streak }}</strong>
-        <span v-if="session.bestStreak > 0"> · best {{ session.bestStreak }}</span>
-      </p>
+        <template #footer>
+          <p class="streak">
+            Streak <strong>{{ session.streak }}</strong>
+            <span v-if="session.bestStreak > 0"> · best {{ session.bestStreak }}</span>
+          </p>
+        </template>
+      </PracticeSidebar>
     </template>
-  </section>
+  </SessionLayout>
 </template>
 
 <style scoped>
-.multi { display: flex; flex-direction: column; gap: 1rem; align-items: center; }
-
-.options {
-  align-self: stretch; display: flex; flex-direction: column; gap: 0.5rem;
-  font-size: 0.8rem; color: var(--ink-dim);
-}
 .toggle { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
-.range-row { display: flex; justify-content: space-between; gap: 0.5rem; }
-.range-row .value { color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 600; }
-.options input[type='range'] { width: 100%; accent-color: var(--accent); margin: -0.2rem 0 0.2rem; }
+.range-field { display: flex; align-items: center; gap: 0.5rem; }
+.range-field input[type='range'] { width: 8rem; accent-color: var(--accent); }
+.range-field .value {
+  min-width: 4.5em; color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 600;
+}
 
 .gate { display: flex; flex-direction: column; gap: 1rem; align-items: center; text-align: center; padding: 2rem 0; }
 .blurb { margin: 0; max-width: 34ch; color: var(--ink-dim); font-size: 0.9rem; line-height: 1.55; }
@@ -301,24 +297,5 @@ button.primary {
 }
 button:disabled { opacity: 0.6; cursor: default; }
 
-.status { width: 100%; max-width: 340px; }
-.hold-track { height: 3px; background: var(--surface-2); border-radius: 2px; overflow: hidden; }
-.hold-fill { height: 100%; background: var(--accent-ok); transition: width 60ms linear; }
-.feedback {
-  margin: 0.4rem 0 0; text-align: center; font-size: 0.9rem; font-weight: 600;
-  color: var(--ink-dim); min-height: 1.3em;
-}
-.status.correct .feedback { color: var(--accent-ok); }
-.status.wrong .feedback { color: var(--accent-warn); }
-
-.hint-box {
-  width: 100%; max-width: 340px; background: var(--surface-2);
-  border: 1px solid var(--line); border-radius: 12px; padding: 0.85rem;
-}
-.fade-enter-active { transition: opacity 200ms ease, transform 200ms ease; }
-.fade-enter-from { opacity: 0; transform: translateY(6px); }
-.fade-leave-active { display: none; }
-
-.actions { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
-.streak { margin: 0; font-size: 0.78rem; color: var(--ink-faint); }
+.streak { margin: 0; }
 </style>

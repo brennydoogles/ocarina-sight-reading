@@ -18,7 +18,7 @@ A4-F6 (see `validateSong` in `src/music/abc.js`), so only those 21 notes are
 bundled -- about 525KB, comfortably inside `vite.config.js`'s 4MB workbox
 precache cap.
 
-## Provenance and licence
+## Provenance and license
 
 Downloaded from the `FluidR3_GM/ocarina-mp3/` directory of
 https://github.com/paulrosen/midi-js-soundfonts (the same soundfont set

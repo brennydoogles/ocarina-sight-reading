@@ -15,12 +15,12 @@ const DURATION_FOR_EIGHTHS = { 1: '8', 2: 'q', 4: 'h', 8: 'w' };
  * duration vocabulary itself.
  */
 export const QUARTERS_PER_DURATION = Object.freeze({ w: 4, h: 2, q: 1, 8: 0.5 });
-/** Favour short notes; a whole bar's worth in one note is a rare event. */
+/** Favor short notes; a whole bar's worth in one note is a rare event. */
 const EIGHTHS_WEIGHT = { 1: 45, 2: 35, 4: 15, 8: 5 };
 
 /**
  * Whether `remaining` eighths can be split into exactly `notes` parts, each
- * one of EIGHTHS. Memoised because the same (remaining, notes) pair recurs
+ * one of EIGHTHS. Memoized because the same (remaining, notes) pair recurs
  * constantly while filling a bar.
  */
 function canFill(remaining, notes, memo) {

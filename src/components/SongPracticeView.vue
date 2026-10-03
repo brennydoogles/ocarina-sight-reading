@@ -198,7 +198,7 @@ onUnmounted(() => {
             <p class="song-date">Added {{ formatDate(song.addedAt) }}</p>
           </div>
           <div class="song-actions">
-            <button class="primary" @click="startPractice(song)">Practise</button>
+            <button class="primary" @click="startPractice(song)">Practice</button>
             <button @click="startEdit(song)">Edit</button>
             <button
               class="danger"
@@ -212,66 +212,72 @@ onUnmounted(() => {
 
     <SongSession v-else-if="mode === 'practice'" :song="practicingSong" @back="backToLibrary" />
 
-    <template v-else>
-      <div class="field">
-        <label for="song-title">Title</label>
-        <input id="song-title" v-model="title" type="text" placeholder="Untitled" />
+    <!-- Wide screens: the ABC text on the left, filling the height, with the
+         checks and Save beside it. -->
+    <div v-else class="editor">
+      <div class="editor-main">
+        <div class="field">
+          <label for="song-title">Title</label>
+          <input id="song-title" v-model="title" type="text" placeholder="Untitled" />
+        </div>
+
+        <div class="field abc">
+          <label for="song-abc">ABC notation</label>
+          <textarea
+            id="song-abc" v-model="abc" rows="10" spellcheck="false"
+            placeholder="X:1&#10;T:Title&#10;M:4/4&#10;L:1/4&#10;K:C&#10;C D E F | G A B c |]"
+          />
+        </div>
       </div>
 
-      <div class="field">
-        <label for="song-abc">ABC notation</label>
-        <textarea
-          id="song-abc" v-model="abc" rows="10" spellcheck="false"
-          placeholder="X:1&#10;T:Title&#10;M:4/4&#10;L:1/4&#10;K:C&#10;C D E F | G A B c |]"
-        />
+      <div class="editor-side">
+        <div class="validation" :class="{ pending: validating }">
+          <p v-if="!abc.trim()" class="hint">Paste or type an ABC tune to check it.</p>
+          <p v-else-if="validating" class="hint">Checking…</p>
+          <template v-else-if="validation">
+            <p v-if="validation.valid" class="status ok">
+              Looks good{{ validation.title ? ` — “${validation.title}”` : '' }}.
+              <span v-if="validation.meter"> {{ validation.meter.num }}/{{ validation.meter.den }} time.</span>
+              <span v-if="validation.bpm"> {{ validation.bpm }} BPM.</span>
+            </p>
+            <p v-else class="status error">This tune can't be played yet:</p>
+
+            <p v-if="validation.needsAccidentals" class="hint">
+              This tune needs sharps or flats — some notes aren't naturals.
+            </p>
+
+            <ul v-if="validation.issues.length > 0" class="issues">
+              <li v-for="(issue, i) in validation.issues" :key="i" :class="issue.severity">
+                {{ issue.message }}
+                <ul v-if="issue.notes" class="issue-notes">
+                  <li v-for="(n, j) in issue.notes" :key="j">
+                    Measure {{ n.bar }}: {{ n.name }}
+                    <span v-if="n.semitonesOver">, {{ n.semitonesOver }} half step{{ n.semitonesOver === 1 ? '' : 's' }} above the top note</span>
+                    <span v-if="n.semitonesUnder">, {{ n.semitonesUnder }} half step{{ n.semitonesUnder === 1 ? '' : 's' }} below the bottom note</span>
+                  </li>
+                </ul>
+              </li>
+            </ul>
+
+            <button v-if="validation.transposition" class="transpose" @click="acceptTransposition">
+              Transpose {{ Math.abs(validation.transposition.semitones) }}
+              half step{{ Math.abs(validation.transposition.semitones) === 1 ? '' : 's' }}
+              {{ validation.transposition.direction }} to fit
+            </button>
+          </template>
+        </div>
+
+        <div class="actions">
+          <button class="primary" :disabled="!validation?.valid" @click="save">Save</button>
+          <button @click="cancel">Cancel</button>
+        </div>
       </div>
-
-      <div class="validation" :class="{ pending: validating }">
-        <p v-if="!abc.trim()" class="hint">Paste or type an ABC tune above.</p>
-        <p v-else-if="validating" class="hint">Checking…</p>
-        <template v-else-if="validation">
-          <p v-if="validation.valid" class="status ok">
-            Looks good{{ validation.title ? ` — “${validation.title}”` : '' }}.
-            <span v-if="validation.meter"> {{ validation.meter.num }}/{{ validation.meter.den }} time.</span>
-            <span v-if="validation.bpm"> {{ validation.bpm }} BPM.</span>
-          </p>
-          <p v-else class="status error">This tune can't be played yet:</p>
-
-          <p v-if="validation.needsAccidentals" class="hint">
-            This tune needs semitones — some notes aren't naturals.
-          </p>
-
-          <ul v-if="validation.issues.length > 0" class="issues">
-            <li v-for="(issue, i) in validation.issues" :key="i" :class="issue.severity">
-              {{ issue.message }}
-              <ul v-if="issue.notes" class="issue-notes">
-                <li v-for="(n, j) in issue.notes" :key="j">
-                  Bar {{ n.bar }}: {{ n.name }}
-                  <span v-if="n.semitonesOver">, {{ n.semitonesOver }} semitone{{ n.semitonesOver === 1 ? '' : 's' }} above the top note</span>
-                  <span v-if="n.semitonesUnder">, {{ n.semitonesUnder }} semitone{{ n.semitonesUnder === 1 ? '' : 's' }} below the bottom note</span>
-                </li>
-              </ul>
-            </li>
-          </ul>
-
-          <button v-if="validation.transposition" class="transpose" @click="acceptTransposition">
-            Transpose {{ Math.abs(validation.transposition.semitones) }}
-            semitone{{ Math.abs(validation.transposition.semitones) === 1 ? '' : 's' }}
-            {{ validation.transposition.direction }} to fit
-          </button>
-        </template>
-      </div>
-
-      <div class="actions">
-        <button class="primary" :disabled="!validation?.valid" @click="save">Save</button>
-        <button @click="cancel">Cancel</button>
-      </div>
-    </template>
+    </div>
   </section>
 </template>
 
 <style scoped>
-.songs { display: flex; flex-direction: column; gap: 1rem; }
+.songs { flex: 1; display: flex; flex-direction: column; gap: 1rem; }
 
 .blurb { margin: 0; color: var(--ink-dim); font-size: 0.85rem; line-height: 1.5; }
 
@@ -287,7 +293,11 @@ onUnmounted(() => {
 
 .empty { margin: 0; color: var(--ink-faint); font-size: 0.85rem; text-align: center; padding: 1.5rem 0; }
 
-.song-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+/* Song cards flow into as many columns as fit. */
+.song-list {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 0.6rem;
+}
 .song-row {
   display: flex; flex-direction: column; gap: 0.6rem;
   padding: 0.7rem 0.85rem; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2);
@@ -338,4 +348,18 @@ button.danger.confirming { background: var(--accent-warn); border-color: var(--a
 }
 
 .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+.editor, .editor-main, .editor-side { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+
+/* Keep in step with WIDE_LAYOUT_QUERY in useMediaQuery.js. */
+@media (min-width: 900px) {
+  .editor {
+    flex: 1;
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(300px, 2fr);
+    gap: 1.5rem;
+  }
+  .field.abc { flex: 1; }
+  .field.abc textarea { flex: 1; min-height: 12rem; resize: none; }
+}
 </style>

@@ -34,7 +34,7 @@ export function fingeringFileStem(midi) {
 }
 
 /**
- * URL to fetch a fingering file from, honouring the app's deploy base so this
+ * URL to fetch a fingering file from, honoring the app's deploy base so this
  * keeps working when served from a subpath.
  * @param {string} stem
  * @param {string} [base] defaults to the Vite base URL, or '/' outside Vite

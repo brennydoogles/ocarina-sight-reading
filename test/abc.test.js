@@ -68,7 +68,7 @@ describe('parseAbc', () => {
     expect(parsed.notes.map((n) => n.midi)).toEqual([66, 65]);
   });
 
-  it('extracts title, metre and tempo', async () => {
+  it('extracts title, meter and tempo', async () => {
     const parsed = await parseAbc(tune('A B', { extraHeaders: 'M:3/4\nQ:1/4=100\n' }));
     expect(parsed.title).toBe('Test');
     expect(parsed.meter).toEqual({ num: 3, den: 4 });

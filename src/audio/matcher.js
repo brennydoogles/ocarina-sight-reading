@@ -80,7 +80,7 @@ export class NoteMatcher {
     this.completedAt = null;
     /** Signed cents from the target for the most recent usable reading. */
     this.cents = null;
-    /** What they played instead, when it is a recognisable note. */
+    /** What they played instead, when it is a recognizable note. */
     this.heardMidi = null;
   }
 

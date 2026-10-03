@@ -29,7 +29,7 @@ const AUDIO_CONSTRAINTS = {
   channelCount: 1,
 };
 
-/** Pre-Unified-Plan Chrome spellings. Some Android builds still honour only these. */
+/** Pre-Unified-Plan Chrome spellings. Some Android builds still honor only these. */
 const LEGACY_CONSTRAINTS = {
   googEchoCancellation: false,
   googAutoGainControl: false,
@@ -50,7 +50,7 @@ export function useMicrophone({ fftSize = 2048 } = {}) {
   const appliedConstraints = ref(null);
 
   const context = shallowRef(null);
-  const analyser = shallowRef(null);
+  const analyzer = shallowRef(null);
   const stream = shallowRef(null);
   const buffer = shallowRef(null);
   /**
@@ -108,16 +108,16 @@ export function useMicrophone({ fftSize = 2048 } = {}) {
 
     sampleRate.value = context.value.sampleRate;
 
-    analyser.value = context.value.createAnalyser();
-    analyser.value.fftSize = fftSize;
-    // Time-domain data only; smoothing would blur the waveform we analyse.
-    analyser.value.smoothingTimeConstant = 0;
+    analyzer.value = context.value.createAnalyser();
+    analyzer.value.fftSize = fftSize;
+    // Time-domain data only; smoothing would blur the waveform we analyze.
+    analyzer.value.smoothingTimeConstant = 0;
     source.value = context.value.createMediaStreamSource(stream.value);
-    source.value.connect(analyser.value);
-    // Note: the analyser is intentionally NOT connected to the destination --
+    source.value.connect(analyzer.value);
+    // Note: the analyzer is intentionally NOT connected to the destination --
     // routing the mic to the speakers would feed back.
 
-    buffer.value = new Float32Array(analyser.value.fftSize);
+    buffer.value = new Float32Array(analyzer.value.fftSize);
     status.value = MIC.READY;
     return true;
   }
@@ -136,8 +136,8 @@ export function useMicrophone({ fftSize = 2048 } = {}) {
    * @returns {Float32Array|null}
    */
   function readFrame() {
-    if (!analyser.value || !buffer.value) return null;
-    analyser.value.getFloatTimeDomainData(buffer.value);
+    if (!analyzer.value || !buffer.value) return null;
+    analyzer.value.getFloatTimeDomainData(buffer.value);
     return buffer.value;
   }
 
@@ -146,7 +146,7 @@ export function useMicrophone({ fftSize = 2048 } = {}) {
     context.value?.close();
     stream.value = null;
     context.value = null;
-    analyser.value = null;
+    analyzer.value = null;
     source.value = null;
     buffer.value = null;
     status.value = MIC.IDLE;

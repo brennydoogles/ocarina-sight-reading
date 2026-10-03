@@ -12,7 +12,7 @@
  * the two ids that were set by hand (rightPinky, rightThumb): camelCase of the
  * label.
  *
- * Edits are surgical -- only the id attribute of a labelled hole element is
+ * Edits are surgical -- only the id attribute of a labeled hole element is
  * rewritten. Everything else in the file, including Inkscape's own metadata
  * and formatting, is left byte-for-byte alone.
  *
@@ -66,7 +66,7 @@ for (const file of files) {
   const { out, changes, missing } = retag(text);
 
   if (missing.length) {
-    console.error(`${file}: NO ELEMENT LABELLED ${missing.join(', ')} -- skipped, nothing written`);
+    console.error(`${file}: NO ELEMENT LABELED ${missing.join(', ')} -- skipped, nothing written`);
     problems += 1;
     continue;
   }

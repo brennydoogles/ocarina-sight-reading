@@ -37,7 +37,7 @@ const caption = computed(() => {
   <div class="meter" :class="{ active: offset !== null }">
     <div class="track">
       <div class="band" :style="{ width: `${bandWidth}%` }" />
-      <div class="centre" />
+      <div class="center" />
       <div
         v-if="offset !== null"
         class="needle"
@@ -67,7 +67,7 @@ const caption = computed(() => {
   transform: translateX(-50%);
   background: color-mix(in srgb, var(--accent-ok) 18%, transparent);
 }
-.centre {
+.center {
   position: absolute;
   left: 50%;
   top: 4px;

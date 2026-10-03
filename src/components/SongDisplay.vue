@@ -1,10 +1,13 @@
 <script setup>
-import { ref, shallowRef, watch, onMounted } from 'vue';
+import { ref, shallowRef, computed, watch, onMounted } from 'vue';
 // Same bundled-fonts entry as StaffDisplay.vue/PhraseDisplay.vue, for the
 // same reason: Bravura + Academico inlined as base64 so the PWA can draw a
 // staff offline. Do not switch to the default `vexflow` entry.
 import VexFlow from 'vexflow/bravura';
 import { toVexKey, noteName } from '../music/pitch.js';
+import { packLines, justifyLine } from '../music/staffLayout.js';
+import { useElementSize } from './useElementSize.js';
+import { useMediaQuery, WIDE_LAYOUT_QUERY } from './useMediaQuery.js';
 
 const props = defineProps({
   /** @type {import('vue').PropType<import('../music/abc.js').AbcEvent[]>} */
@@ -24,21 +27,29 @@ const {
 } = VexFlow;
 
 /** How many staff lines are drawn at once. A song can run much longer than
- *  a phone screen; rather than one huge scrolling SVG (or hand-rolled
+ *  a screen; rather than one huge scrolling SVG (or hand-rolled
  *  scroll-into-view math against a responsively-scaled SVG), only a window
  *  starting at the current line is ever drawn, sliding forward as the
  *  cursor crosses a line boundary. That keeps "the current note stays on
- *  screen" trivially true and bounds render cost for a long tune. */
+ *  screen" trivially true and bounds render cost for a long tune.
+ *
+ *  On a wide screen the window is as many lines as fit the height the
+ *  layout gives the staff, so the page never scrolls; on a phone, where the
+ *  page scrolls anyway, it is a fixed WINDOW_SIZE. */
 const WINDOW_SIZE = 4;
-const ROW_HEIGHT = 150;
-const TOP_MARGIN = 70;
-const WIDTH = 320;
-const STAVE_MARGIN = 20; // matches new Stave(10, y, WIDTH - 20) elsewhere
-
-const BASE_BAR_WIDTH = 30;
-const PER_NOTE_WIDTH = 26;
-const CLEF_KEY_WIDTH = 70;
-const TIME_SIG_WIDTH = 25;
+/** Vertical budget per line, in SVG units, sized to the instrument rather than
+ *  to any note at all: a stave sits 40 units below its line's top, F6 (three
+ *  ledger lines up) reaches back to about that top, and the lowest stem --
+ *  a stem-down B4 -- ends about 100 units down. 125 leaves room for the next
+ *  line's measure numbers between the two. */
+const ROW_HEIGHT = 125;
+/** Room above the first line for its measure numbers and an F6. */
+const TOP_MARGIN = 35;
+/** On-screen pixels per SVG unit. The drawing is as wide as the box it sits
+ *  in divided by this, so a wider screen fits more bars at the same note
+ *  size rather than drawing the same bars bigger. */
+const NOTE_SCALE = 1;
+const STAVE_MARGIN = 20; // 10 units either side of each line
 
 const SHARP_KEYS = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#'];
 const FLAT_KEYS = ['C', 'F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb'];
@@ -54,6 +65,17 @@ const EPS = 1e-6;
 
 const host = ref(null);
 const fontsReady = shallowRef(false);
+const hostSize = useElementSize(host);
+/** Drawing width in SVG units; 0 until the host has been laid out. */
+const width = computed(() => Math.floor(hostSize.width.value / NOTE_SCALE));
+/** Wide layout: the staff fills the height it is given, rather than its height
+ *  following the number of lines drawn. */
+const fillHeight = useMediaQuery(WIDE_LAYOUT_QUERY);
+const windowSize = computed(() => {
+  if (!fillHeight.value) return WINDOW_SIZE;
+  const units = hostSize.height.value / NOTE_SCALE;
+  return Math.max(1, Math.floor((units - TOP_MARGIN) / ROW_HEIGHT));
+});
 
 onMounted(async () => {
   try {
@@ -63,7 +85,11 @@ onMounted(async () => {
   draw();
 });
 
-watch(() => [props.notes, props.keySignature, props.meter, props.currentIndex, props.state], draw, { flush: 'post' });
+watch(
+  () => [props.notes, props.keySignature, props.meter, props.currentIndex, props.state, width.value, windowSize.value],
+  draw,
+  { flush: 'post' },
+);
 
 /** The key signature's sharp/flat count and direction determine the
  *  standard major key with that exact accidental set -- true regardless of
@@ -117,41 +143,6 @@ function groupIntoBars(notes) {
   return bars;
 }
 
-function barWidth(bar, { isFirstInLine, isFirstOfPiece }) {
-  let w = BASE_BAR_WIDTH + bar.notes.length * PER_NOTE_WIDTH;
-  if (isFirstInLine) w += CLEF_KEY_WIDTH;
-  if (isFirstOfPiece) w += TIME_SIG_WIDTH;
-  return w;
-}
-
-/** Greedily packs bars into lines by an estimated width -- VexFlow's own
- *  Formatter then justifies each bar's notes to fill whatever width it's
- *  given, so this only has to be in the right ballpark, not exact. */
-function packLines(bars, lineWidthBudget) {
-  const lines = [];
-  let current = [];
-  let usedWidth = 0;
-  for (const bar of bars) {
-    const isFirstOfPiece = bar.index === 0;
-    if (current.length === 0) {
-      current.push(bar);
-      usedWidth = barWidth(bar, { isFirstInLine: true, isFirstOfPiece });
-      continue;
-    }
-    const widthIfContinuing = barWidth(bar, { isFirstInLine: false, isFirstOfPiece });
-    if (usedWidth + widthIfContinuing <= lineWidthBudget) {
-      current.push(bar);
-      usedWidth += widthIfContinuing;
-    } else {
-      lines.push(current);
-      current = [bar];
-      usedWidth = barWidth(bar, { isFirstInLine: true, isFirstOfPiece });
-    }
-  }
-  if (current.length > 0) lines.push(current);
-  return lines;
-}
-
 function lineIndexForNote(lines, globalIndex, totalNotes) {
   if (globalIndex >= totalNotes) return Math.max(0, lines.length - 1);
   for (let li = 0; li < lines.length; li += 1) {
@@ -164,40 +155,47 @@ function lineIndexForNote(lines, globalIndex, totalNotes) {
 }
 
 function draw() {
-  if (!fontsReady.value || !host.value) return;
+  // A zero width means the host is detached (KeepAlive) or not laid out yet:
+  // keep whatever was last drawn rather than redrawing at a bogus size.
+  if (!fontsReady.value || !host.value || width.value === 0) return;
   host.value.innerHTML = '';
   if (props.notes.length === 0) return;
 
+  const drawWidth = width.value;
+  const lineWidth = drawWidth - STAVE_MARGIN;
   const bars = groupIntoBars(props.notes);
-  const lines = packLines(bars, WIDTH - STAVE_MARGIN);
+  const lines = packLines(bars, lineWidth);
   const currentLine = lineIndexForNote(lines, props.currentIndex, props.notes.length);
-  const windowLines = lines.slice(currentLine, currentLine + WINDOW_SIZE);
+  const windowLines = lines.slice(currentLine, currentLine + windowSize.value);
   const height = TOP_MARGIN + windowLines.length * ROW_HEIGHT;
 
   const renderer = new Renderer(host.value, Renderer.Backends.SVG);
-  renderer.resize(WIDTH, height);
+  renderer.resize(drawWidth, height);
   const ctx = renderer.getContext();
 
   const ink = getComputedStyle(host.value).getPropertyValue('--staff-ink').trim() || '#000';
   ctx.setFillStyle(ink);
   ctx.setStrokeStyle(ink);
 
-  const colourFor = {
+  const colorFor = {
     correct: getVar('--note-correct', '#3fb950'),
     wrong: getVar('--note-wrong', '#d98a3a'),
     holding: getVar('--note-holding', '#4a9eff'),
   };
-  const doneColour = colourFor.correct;
+  const doneColor = colorFor.correct;
   const keyName = vexKeyName(props.keySignature);
 
   windowLines.forEach((line, li) => {
     const y = TOP_MARGIN + li * ROW_HEIGHT;
-    let x = 10;
+    let x = STAVE_MARGIN / 2;
+    const barWidths = justifyLine(line, lineWidth, {
+      isLastLine: lines.length > 1 && line === lines[lines.length - 1],
+    });
 
     line.forEach((bar, bi) => {
       const isFirstOfPiece = bar.index === 0;
-      const width = barWidth(bar, { isFirstInLine: bi === 0, isFirstOfPiece });
-      const stave = new Stave(x, y, width);
+      const barWidth = barWidths[bi];
+      const stave = new Stave(x, y, barWidth);
       if (bi === 0) {
         stave.addClef('treble');
         stave.addKeySignature(keyName);
@@ -212,10 +210,10 @@ function draw() {
       const staveNotes = bar.notes.map((note, ni) => {
         const globalIndex = bar.startIndex + ni;
         const staveNote = buildStaveNote(note);
-        const colour = globalIndex === props.currentIndex ? colourFor[props.state]
-          : globalIndex < props.currentIndex ? doneColour
+        const color = globalIndex === props.currentIndex ? colorFor[props.state]
+          : globalIndex < props.currentIndex ? doneColor
             : null;
-        if (colour) staveNote.setStyle({ fillStyle: colour, strokeStyle: colour });
+        if (color) staveNote.setStyle({ fillStyle: color, strokeStyle: color });
         return staveNote;
       });
 
@@ -229,13 +227,13 @@ function draw() {
       new Formatter().joinVoices([voice]).format([voice], fit - 20);
       voice.draw(ctx, stave);
 
-      x += width;
+      x += barWidth;
     });
   });
 
   const svg = host.value.querySelector('svg');
   if (svg) {
-    svg.setAttribute('viewBox', `0 0 ${WIDTH} ${height}`);
+    svg.setAttribute('viewBox', `0 0 ${drawWidth} ${height}`);
     svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
     svg.removeAttribute('width');
     svg.removeAttribute('height');
@@ -246,7 +244,7 @@ function draw() {
       : bars.find((b) => props.currentIndex >= b.startIndex && props.currentIndex < b.startIndex + b.notes.length)?.barNumber ?? 1;
     svg.setAttribute('aria-label', atEnd
       ? 'Song complete.'
-      : `Song, ${props.meter.num}/${props.meter.den} time, currently on bar ${currentBar}.`);
+      : `Song, ${props.meter.num}/${props.meter.den} time, currently on measure ${currentBar}.`);
   }
 }
 
@@ -263,7 +261,7 @@ function getVar(name, fallback) {
 </script>
 
 <template>
-  <div class="staff-block">
+  <div class="staff-block" :class="{ fill: fillHeight }">
     <p class="note-name" :class="{ shown: showName }" aria-live="polite">
       <span v-if="showName">{{ currentNoteName() }}</span>
     </p>
@@ -274,13 +272,15 @@ function getVar(name, fallback) {
 <style scoped>
 .staff-block {
   width: 100%;
-  max-width: 340px;
   margin: 0 auto;
 }
 .staff {
   --staff-ink: var(--ink);
   width: 100%;
 }
+.staff-block.fill { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+/* Sized by the layout, not by the SVG inside it -- the SVG is drawn to fit. */
+.staff-block.fill .staff { flex: 1 1 0; min-height: 0; overflow: hidden; }
 
 .note-name {
   margin: 0;

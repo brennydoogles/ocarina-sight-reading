@@ -189,7 +189,7 @@ describe('seedFromFolder', () => {
     expect(songs.songs.some((s) => s.title === 'Test Tune')).toBe(true);
   });
 
-  it('falls back to a humanised filename when the tune has no T: field', async () => {
+  it('falls back to a humanized filename when the tune has no T: field', async () => {
     const songs = useSongsStore();
     await songs.seedFromFolder({ fetchImpl: makeFetch({ 'no_title.abc': NO_TITLE_ABC }) });
     expect(songs.songs.some((s) => s.title === 'No Title')).toBe(true);

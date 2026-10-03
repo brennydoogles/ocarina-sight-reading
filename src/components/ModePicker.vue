@@ -41,9 +41,15 @@ const MODES = [
 </template>
 
 <style scoped>
-.picker { display: flex; flex-direction: column; gap: 0.7rem; }
+/* As many ~300px columns as fit -- four across the full-width shell, one on a
+   phone -- so adding a mode only ever adds a card, never a breakpoint. */
+.picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 0.7rem;
+}
 .card {
-  display: flex; flex-direction: column; gap: 0.3rem; text-align: left;
+  display: flex; flex-direction: column; justify-content: flex-start; gap: 0.3rem; text-align: left;
   font: inherit; padding: 0.9rem 1rem; cursor: pointer;
   border: 1px solid var(--line); background: var(--surface-2); color: var(--ink);
   border-radius: 12px;

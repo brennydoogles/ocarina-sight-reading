@@ -54,7 +54,7 @@ describe('nearestNote', () => {
     expect(cents).toBeCloseTo(30, 6);
   });
 
-  it('snaps to the neighbour past the halfway point', () => {
+  it('snaps to the neighbor past the halfway point', () => {
     const justOver = midiToHz(69) * Math.pow(2, 51 / 1200);
     expect(nearestNote(justOver).midi).toBe(70);
   });

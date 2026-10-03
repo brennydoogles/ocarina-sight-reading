@@ -1,8 +1,8 @@
 <script setup>
 import { ref, computed, shallowRef, onUnmounted, watch } from 'vue';
 import StaffDisplay from './StaffDisplay.vue';
-import FingeringChart from './FingeringChart.vue';
-import PitchMeter from './PitchMeter.vue';
+import SessionLayout from './SessionLayout.vue';
+import PracticeSidebar from './PracticeSidebar.vue';
 import { useMicrophone, MIC } from '../audio/useMicrophone.js';
 import { usePitchDetection } from '../audio/usePitchDetection.js';
 import { NoteMatcher, MATCH } from '../audio/matcher.js';
@@ -154,80 +154,74 @@ onUnmounted(stop);
 </script>
 
 <template>
-  <section class="tutorial">
-    <label class="toggle">
-      <input type="checkbox" v-model="options.includeAccidentals.value" />
-      Include sharps
-    </label>
+  <SessionLayout>
+    <template #music>
+      <!-- Pre-flight: microphone permission and failure states. -->
+      <div v-if="!running" class="gate">
+        <template v-if="mic.status.value === MIC.DENIED || mic.status.value === MIC.UNSUPPORTED || mic.status.value === MIC.ERROR">
+          <p class="error">{{ mic.error.value }}</p>
+          <button class="primary" @click="begin">Try again</button>
+        </template>
+        <template v-else>
+          <p class="blurb">
+            A guided walk through your practice range, one note at a time,
+            then the C major scale. The fingering is always shown — this is
+            for learning, not testing.
+          </p>
+          <button class="primary" :disabled="mic.status.value === MIC.REQUESTING" @click="begin">
+            {{ mic.status.value === MIC.REQUESTING ? 'Waiting for microphone…' : 'Start tutorial' }}
+          </button>
+          <p v-if="progress.stepIndex > 0" class="resume">
+            Resuming at step {{ currentIndex + 1 }} of {{ steps.length }}.
+            <button class="link" @click="restart">Start over instead</button>
+          </p>
+        </template>
+      </div>
 
-    <!-- Pre-flight: microphone permission and failure states. -->
-    <div v-if="!running" class="gate">
-      <template v-if="mic.status.value === MIC.DENIED || mic.status.value === MIC.UNSUPPORTED || mic.status.value === MIC.ERROR">
-        <p class="error">{{ mic.error.value }}</p>
-        <button class="primary" @click="begin">Try again</button>
-      </template>
-      <template v-else>
-        <p class="blurb">
-          A guided walk through your practice range, one note at a time,
-          then the C major scale. The fingering is always shown — this is
-          for learning, not testing.
-        </p>
-        <button class="primary" :disabled="mic.status.value === MIC.REQUESTING" @click="begin">
-          {{ mic.status.value === MIC.REQUESTING ? 'Waiting for microphone…' : 'Start tutorial' }}
-        </button>
-        <p v-if="progress.stepIndex > 0" class="resume">
-          Resuming at step {{ currentIndex + 1 }} of {{ steps.length }}.
-          <button class="link" @click="restart">Start over instead</button>
-        </p>
-      </template>
-    </div>
-
-    <template v-else-if="isComplete">
-      <div class="done">
+      <div v-else-if="isComplete" class="done">
         <h3>Tutorial complete</h3>
         <p>You've worked through your practice range and the C major scale.</p>
         <button class="primary" @click="restart">Restart</button>
       </div>
+
+      <template v-else-if="step">
+        <p class="section">{{ SECTION_LABEL[step.section] }} · step {{ currentIndex + 1 }} of {{ steps.length }}</p>
+        <StaffDisplay :midi="step.midi" :state="noteState" show-name />
+      </template>
     </template>
 
-    <template v-else-if="step">
-      <p class="section">{{ SECTION_LABEL[step.section] }} · step {{ currentIndex + 1 }} of {{ steps.length }}</p>
+    <template #toolbar>
+      <label class="toggle">
+        <input type="checkbox" v-model="options.includeAccidentals.value" />
+        Include sharps
+      </label>
+    </template>
 
-      <StaffDisplay :midi="step.midi" :state="noteState" show-name />
-
-      <PitchMeter
+    <template #sidebar>
+      <!-- The hint is always shown, unlike the drills' hint ladder: this is a
+           teaching mode, so how to play the note is never withheld. -->
+      <PracticeSidebar
+        :hint-midi="running && !isComplete && step ? step.midi : null"
+        hint-shown
         :reading="detection.reading.value"
         :cents="liveCents"
         :tolerance="settings.toleranceCents"
-      />
-
-      <div class="status" :class="noteState">
-        <div class="hold-track"><div class="hold-fill" :style="{ width: `${holdProgress * 100}%` }" /></div>
-        <p class="feedback">{{ feedback }}</p>
-      </div>
-
-      <!-- Always shown, unlike the drills' hint ladder: this is a teaching
-           mode, so how to play the note is never withheld. -->
-      <div class="hint-box">
-        <FingeringChart :midi="step.midi" />
-      </div>
-
-      <div class="actions">
-        <button @click="skip">Skip</button>
-        <button @click="restart">Restart</button>
-        <button @click="stop">Stop</button>
-      </div>
+        :hold-progress="holdProgress"
+        :note-state="noteState"
+        :feedback="feedback"
+      >
+        <template v-if="running && !isComplete && step">
+          <button @click="skip">Skip</button>
+          <button @click="restart">Restart</button>
+          <button @click="stop">Stop</button>
+        </template>
+      </PracticeSidebar>
     </template>
-  </section>
+  </SessionLayout>
 </template>
 
 <style scoped>
-.tutorial { display: flex; flex-direction: column; gap: 1rem; align-items: center; }
-
-.toggle {
-  align-self: flex-start; display: flex; align-items: center; gap: 0.4rem;
-  font-size: 0.8rem; color: var(--ink-dim); cursor: pointer;
-}
+.toggle { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
 
 .gate { display: flex; flex-direction: column; gap: 1rem; align-items: center; text-align: center; padding: 2rem 0; }
 .blurb { margin: 0; max-width: 34ch; color: var(--ink-dim); font-size: 0.9rem; line-height: 1.55; }
@@ -251,23 +245,6 @@ button.primary {
 button:disabled { opacity: 0.6; cursor: default; }
 
 .section { margin: 0; font-size: 0.78rem; color: var(--ink-faint); text-align: center; }
-
-.status { width: 100%; max-width: 340px; }
-.hold-track { height: 3px; background: var(--surface-2); border-radius: 2px; overflow: hidden; }
-.hold-fill { height: 100%; background: var(--accent-ok); transition: width 60ms linear; }
-.feedback {
-  margin: 0.4rem 0 0; text-align: center; font-size: 0.9rem; font-weight: 600;
-  color: var(--ink-dim); min-height: 1.3em;
-}
-.status.correct .feedback { color: var(--accent-ok); }
-.status.wrong .feedback { color: var(--accent-warn); }
-
-.hint-box {
-  width: 100%; max-width: 340px; background: var(--surface-2);
-  border: 1px solid var(--line); border-radius: 12px; padding: 0.85rem;
-}
-
-.actions { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
 
 .done { display: flex; flex-direction: column; gap: 0.7rem; align-items: center; text-align: center; padding: 2rem 0; }
 .done h3 { margin: 0; font-size: 1rem; font-weight: 700; }
