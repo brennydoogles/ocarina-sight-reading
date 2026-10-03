@@ -63,23 +63,31 @@ const mode = ref(null);
 </template>
 
 <style scoped>
+/*
+ * The shell spans the whole window so that, on wide screens, <main> can be
+ * the scroll container with its scrollbar at the window's edge; the content
+ * is centered within it by padding rather than by a max-width box.
+ */
 .app {
-  max-width: 1400px;
-  margin: 0 auto;
+  --shell-width: 1400px;
+  --gutter: max(1rem, calc((100% - var(--shell-width)) / 2 + 1rem));
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  padding: 1rem 1rem 0;
-  box-sizing: border-box;
 }
-header { text-align: center; margin-bottom: 1rem; }
+header { text-align: center; padding: 1rem var(--gutter) 0; margin-bottom: 1rem; }
 h1 { margin: 0; font-size: 1.05rem; font-weight: 600; letter-spacing: -0.01em; }
 .sub { margin: 0.1rem 0 0; font-size: 0.75rem; color: var(--ink-faint); }
 
-main { flex: 1; padding-bottom: 1rem; }
+main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--gutter) 1rem;
+}
 
 .back {
-  display: block; margin: 0 0 0.85rem; font: inherit; font-size: 0.8rem;
+  align-self: flex-start; margin: 0 0 0.85rem; font: inherit; font-size: 0.8rem;
   padding: 0.4rem 0.7rem; cursor: pointer;
   border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-dim);
   border-radius: 8px;
@@ -90,7 +98,7 @@ nav {
   bottom: 0;
   display: flex;
   gap: 0.35rem;
-  padding: 0.5rem 0 calc(0.5rem + env(safe-area-inset-bottom));
+  padding: 0.5rem var(--gutter) calc(0.5rem + env(safe-area-inset-bottom));
   background: linear-gradient(to top, var(--surface) 70%, transparent);
 }
 nav button {
@@ -99,4 +107,13 @@ nav button {
   border-radius: 8px; cursor: pointer;
 }
 nav button.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+
+/* Wide screens: the page itself never scrolls. The practice screens fill
+   exactly the height left for <main>; anything taller (a long song library,
+   a short window) scrolls inside <main>. Keep in step with WIDE_LAYOUT_QUERY
+   in components/useMediaQuery.js. */
+@media (min-width: 900px) {
+  .app { height: 100dvh; }
+  main { min-height: 0; overflow-y: auto; }
+}
 </style>

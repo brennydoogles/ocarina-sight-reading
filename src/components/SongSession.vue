@@ -3,8 +3,8 @@ import {
   ref, computed, shallowRef, onMounted, onUnmounted,
 } from 'vue';
 import SongDisplay from './SongDisplay.vue';
-import FingeringChart from './FingeringChart.vue';
-import PitchMeter from './PitchMeter.vue';
+import SessionLayout from './SessionLayout.vue';
+import PracticeSidebar from './PracticeSidebar.vue';
 import { useMicrophone, MIC } from '../audio/useMicrophone.js';
 import { usePitchDetection } from '../audio/usePitchDetection.js';
 import { SequenceMatcher } from '../audio/sequenceMatcher.js';
@@ -280,38 +280,39 @@ onUnmounted(() => {
 
 <template>
   <section class="session">
-    <button class="back" @click="emit('back')">&larr; Songs</button>
-    <h3 class="title">{{ song.title }}</h3>
+    <div class="session-header">
+      <button class="back" @click="emit('back')">&larr; Songs</button>
+      <h3 class="title">{{ song.title }}</h3>
+    </div>
 
     <p v-if="parseError" class="error">{{ parseError }}</p>
 
-    <template v-else-if="!parsed">
-      <p class="hint">Loading…</p>
-    </template>
+    <p v-else-if="!parsed" class="hint">Loading…</p>
 
-    <template v-else>
-      <div v-if="!running" class="gate">
-        <template v-if="mic.status.value === MIC.DENIED || mic.status.value === MIC.UNSUPPORTED || mic.status.value === MIC.ERROR">
-          <p class="error">{{ mic.error.value }}</p>
-          <button class="primary" @click="begin">Try again</button>
-        </template>
-        <template v-else>
-          <p class="blurb">
-            Play through the tune one note at a time. The cursor waits for the
-            right pitch, held steady, and moves on whenever you're ready.
-          </p>
-          <label class="bar-field">
-            Start from measure
-            <input v-model.number="startBar" type="number" min="1" :max="maxBar" />
-          </label>
-          <button class="primary" :disabled="mic.status.value === MIC.REQUESTING" @click="begin">
-            {{ mic.status.value === MIC.REQUESTING ? 'Waiting for microphone…' : 'Start playing' }}
-          </button>
-        </template>
-      </div>
+    <SessionLayout v-else>
+      <template #music>
+        <div v-if="!running" class="gate">
+          <template v-if="mic.status.value === MIC.DENIED || mic.status.value === MIC.UNSUPPORTED || mic.status.value === MIC.ERROR">
+            <p class="error">{{ mic.error.value }}</p>
+            <button class="primary" @click="begin">Try again</button>
+          </template>
+          <template v-else>
+            <p class="blurb">
+              Play through the tune one note at a time. The cursor waits for the
+              right pitch, held steady, and moves on whenever you're ready.
+            </p>
+            <label class="bar-field">
+              Start from measure
+              <input v-model.number="startBar" type="number" min="1" :max="maxBar" />
+            </label>
+            <button class="primary" :disabled="mic.status.value === MIC.REQUESTING" @click="begin">
+              {{ mic.status.value === MIC.REQUESTING ? 'Waiting for microphone…' : 'Start playing' }}
+            </button>
+          </template>
+        </div>
 
-      <template v-else>
         <SongDisplay
+          v-else
           :notes="parsed.notes"
           :key-signature="parsed.keySignature"
           :meter="parsed.meter ?? { num: 4, den: 4 }"
@@ -319,31 +320,9 @@ onUnmounted(() => {
           :state="displayState"
           :show-name="nameShown"
         />
+      </template>
 
-        <PitchMeter
-          :reading="detection.reading.value"
-          :cents="liveCents"
-          :tolerance="settings.toleranceCents"
-        />
-
-        <div class="status" :class="noteState">
-          <div class="hold-track"><div class="hold-fill" :style="{ width: `${holdProgress * 100}%` }" /></div>
-          <p class="feedback" :class="{ listening }">{{ feedback }}</p>
-        </div>
-
-        <Transition name="fade">
-          <div v-if="(hintShown || listening) && currentNote && !currentNote.isRest && !finished" class="hint-box">
-            <FingeringChart :midi="currentNote.midi" />
-          </div>
-        </Transition>
-
-        <div class="actions">
-          <button v-if="!hintShown && !finished" :disabled="listening" @click="revealHint">Show fingering</button>
-          <button v-if="!finished" :disabled="listening" @click="skipNote">Skip note</button>
-          <button :disabled="listening" @click="restart">Restart</button>
-          <button @click="stop">Stop</button>
-        </div>
-
+      <template v-if="running" #toolbar>
         <div class="resume">
           <label class="bar-field">
             Jump to measure
@@ -352,46 +331,78 @@ onUnmounted(() => {
           <button :disabled="listening" @click="jumpToBar(jumpBar)">Go</button>
         </div>
 
-        <div class="playback">
-          <label class="tempo-field">
-            Tempo <span class="value">{{ tempoPercent }}%</span>
-            <input
-              v-model.number="tempoPercent" type="range"
-              :min="MIN_TEMPO_PERCENT" :max="MAX_TEMPO_PERCENT" step="5"
-            />
-          </label>
-          <div class="playback-actions">
-            <button v-if="!listening" @click="listenFromHere">Listen from here</button>
-            <button v-if="!listening" @click="stepPlayback">Step one note</button>
-            <button v-else @click="stopListening">Stop listening</button>
-          </div>
-          <p v-if="playback.unavailable.value" class="error">{{ playback.errorMessage.value }}</p>
+        <label class="tempo-field">
+          Tempo
+          <input
+            v-model.number="tempoPercent" type="range"
+            :min="MIN_TEMPO_PERCENT" :max="MAX_TEMPO_PERCENT" step="5"
+          />
+          <span class="value">{{ tempoPercent }}%</span>
+        </label>
+
+        <div class="playback-actions">
+          <button v-if="!listening" @click="listenFromHere">Listen from here</button>
+          <button v-if="!listening" @click="stepPlayback">Step one note</button>
+          <button v-else @click="stopListening">Stop listening</button>
         </div>
 
-        <p class="streak">
-          Streak <strong>{{ session.streak }}</strong>
-          <span v-if="session.bestStreak > 0"> · best {{ session.bestStreak }}</span>
-        </p>
+        <p v-if="playback.unavailable.value" class="error">{{ playback.errorMessage.value }}</p>
       </template>
-    </template>
+
+      <template #sidebar>
+        <PracticeSidebar
+          :hint-midi="currentNote && !currentNote.isRest && !finished ? currentNote.midi : null"
+          :hint-shown="running && (hintShown || listening)"
+          :can-reveal="running && !finished"
+          :reveal-disabled="listening"
+          :reading="detection.reading.value"
+          :cents="liveCents"
+          :tolerance="settings.toleranceCents"
+          :hold-progress="holdProgress"
+          :note-state="noteState"
+          :feedback="feedback"
+          :feedback-class="{ listening }"
+          @reveal="revealHint"
+        >
+          <template v-if="running">
+            <button v-if="!finished" :disabled="listening" @click="skipNote">Skip note</button>
+            <button :disabled="listening" @click="restart">Restart</button>
+            <button @click="stop">Stop</button>
+          </template>
+
+          <template #footer>
+            <p class="streak">
+              Streak <strong>{{ session.streak }}</strong>
+              <span v-if="session.bestStreak > 0"> · best {{ session.bestStreak }}</span>
+            </p>
+          </template>
+        </PracticeSidebar>
+      </template>
+    </SessionLayout>
   </section>
 </template>
 
 <style scoped>
-.session { display: flex; flex-direction: column; gap: 1rem; align-items: center; }
+.session { display: flex; flex-direction: column; gap: 1rem; }
 
+.session-header { display: flex; align-items: center; gap: 1rem; }
 .back {
-  align-self: flex-start; font: inherit; font-size: 0.8rem;
+  flex: none; font: inherit; font-size: 0.8rem;
   padding: 0.4rem 0.7rem; cursor: pointer;
   border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-dim);
   border-radius: 8px;
 }
-.title { margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--ink); text-align: center; }
+.title {
+  flex: 1; margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--ink);
+  text-align: center; min-width: 0;
+}
+/* Balances the back button, so the title is centered on the page. */
+.session-header::after { content: ''; flex: none; width: 5rem; }
 
 .gate { display: flex; flex-direction: column; gap: 1rem; align-items: center; text-align: center; padding: 1.5rem 0; }
 .blurb { margin: 0; max-width: 34ch; color: var(--ink-dim); font-size: 0.9rem; line-height: 1.55; }
 .error { margin: 0; max-width: 40ch; color: var(--accent-warn); font-size: 0.85rem; line-height: 1.5; }
-.hint { margin: 0; color: var(--ink-faint); font-size: 0.85rem; }
+.hint { margin: 0; color: var(--ink-faint); font-size: 0.85rem; text-align: center; }
 
 .bar-field {
   display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--ink-dim);
@@ -412,36 +423,16 @@ button.primary {
 }
 button:disabled { opacity: 0.6; cursor: default; }
 
-.status { width: 100%; max-width: 340px; }
-.hold-track { height: 3px; background: var(--surface-2); border-radius: 2px; overflow: hidden; }
-.hold-fill { height: 100%; background: var(--accent-ok); transition: width 60ms linear; }
-.feedback {
-  margin: 0.4rem 0 0; text-align: center; font-size: 0.9rem; font-weight: 600;
-  color: var(--ink-dim); min-height: 1.3em;
-}
-.status.correct .feedback { color: var(--accent-ok); }
-.status.wrong .feedback { color: var(--accent-warn); }
-
-.hint-box {
-  width: 100%; max-width: 340px; background: var(--surface-2);
-  border: 1px solid var(--line); border-radius: 12px; padding: 0.85rem;
-}
-.fade-enter-active { transition: opacity 200ms ease, transform 200ms ease; }
-.fade-enter-from { opacity: 0; transform: translateY(6px); }
-.fade-leave-active { display: none; }
-
-.actions { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
 .resume { display: flex; align-items: center; gap: 0.6rem; }
+.tempo-field { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--ink-dim); }
+.tempo-field input[type='range'] { width: 8rem; accent-color: var(--accent); }
+.tempo-field .value { min-width: 3em; color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 600; }
+.playback-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
-.playback {
-  width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 0.6rem;
-  padding-top: 0.85rem; border-top: 1px solid var(--line);
+.streak { margin: 0; }
+
+/* Keep in step with WIDE_LAYOUT_QUERY in useMediaQuery.js. */
+@media (min-width: 900px) {
+  .session { flex: 1; }
 }
-.tempo-field { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.8rem; color: var(--ink-dim); }
-.tempo-field .value { color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 600; }
-.tempo-field input[type='range'] { width: 100%; accent-color: var(--accent); }
-.playback-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
-.feedback.listening { color: var(--accent); }
-
-.streak { margin: 0; font-size: 0.78rem; color: var(--ink-faint); }
 </style>

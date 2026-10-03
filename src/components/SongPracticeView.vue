@@ -271,7 +271,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.songs { display: flex; flex-direction: column; gap: 1rem; }
+.songs { flex: 1; display: flex; flex-direction: column; gap: 1rem; }
 
 .blurb { margin: 0; color: var(--ink-dim); font-size: 0.85rem; line-height: 1.5; }
 
