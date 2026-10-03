@@ -15,65 +15,81 @@ const fmt = (ms) => (ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(m
       Nothing practiced yet. Play a few notes and per-note timings show up here.
     </div>
 
-    <template v-else>
-      <div class="tiles">
-        <div class="tile"><span class="n">{{ session.completed }}</span><span class="l">notes</span></div>
-        <div class="tile"><span class="n">{{ session.streak }}</span><span class="l">streak</span></div>
-        <div class="tile"><span class="n">{{ session.bestStreak }}</span><span class="l">best</span></div>
-        <div class="tile">
-          <span class="n">{{ Math.round(session.hintRate * 100) }}%</span>
-          <span class="l">needed a hint</span>
+    <!-- A dashboard of columns on a wide screen: totals and per-mode figures,
+         the per-note table, then the note worth reviewing. One column on a
+         phone, in the same order. -->
+    <div v-else class="dashboard">
+      <div class="column">
+        <div class="tiles">
+          <div class="tile"><span class="n">{{ session.completed }}</span><span class="l">notes</span></div>
+          <div class="tile"><span class="n">{{ session.streak }}</span><span class="l">streak</span></div>
+          <div class="tile"><span class="n">{{ session.bestStreak }}</span><span class="l">best</span></div>
+          <div class="tile">
+            <span class="n">{{ Math.round(session.hintRate * 100) }}%</span>
+            <span class="l">needed a hint</span>
+          </div>
+        </div>
+
+        <div class="modes">
+          <h3>By mode</h3>
+          <table>
+            <thead>
+              <tr><th>Mode</th><th>Tries</th><th>Avg</th><th>Hints</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in session.modeBreakdown" :key="row.mode">
+                <td class="note">{{ PRACTICE_MODE_LABELS[row.mode] }}</td>
+                <td>{{ row.attempts || '—' }}</td>
+                <td>{{ row.attempts ? fmt(row.avgMs) : '—' }}</td>
+                <td :class="{ warn: row.hintRate > 0.5 }">
+                  {{ row.attempts ? `${Math.round(row.hintRate * 100)}%` : '—' }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
-      <div class="modes">
-        <h3>By mode</h3>
+      <div class="column">
+        <h3>Weakest notes</h3>
         <table>
           <thead>
-            <tr><th>Mode</th><th>Tries</th><th>Avg</th><th>Hints</th></tr>
+            <tr><th>Note</th><th>Tries</th><th>Avg</th><th>Best</th><th>Hints</th></tr>
           </thead>
           <tbody>
-            <tr v-for="row in session.modeBreakdown" :key="row.mode">
-              <td class="note">{{ PRACTICE_MODE_LABELS[row.mode] }}</td>
-              <td>{{ row.attempts || '—' }}</td>
-              <td>{{ row.attempts ? fmt(row.avgMs) : '—' }}</td>
-              <td :class="{ warn: row.hintRate > 0.5 }">
-                {{ row.attempts ? `${Math.round(row.hintRate * 100)}%` : '—' }}
-              </td>
+            <tr v-for="row in session.rankedNotes" :key="row.midi">
+              <td class="note">{{ row.name }}</td>
+              <td>{{ row.attempts }}</td>
+              <td>{{ fmt(row.avgMs) }}</td>
+              <td>{{ row.bestMs === null ? '—' : fmt(row.bestMs) }}</td>
+              <td :class="{ warn: row.hintRate > 0.5 }">{{ Math.round(row.hintRate * 100) }}%</td>
             </tr>
           </tbody>
         </table>
+        <p class="hint">Sorted weakest first — most hints needed, then slowest.</p>
       </div>
 
-      <h3>Weakest notes</h3>
-      <table>
-        <thead>
-          <tr><th>Note</th><th>Tries</th><th>Avg</th><th>Best</th><th>Hints</th></tr>
-        </thead>
-        <tbody>
-          <tr v-for="row in session.rankedNotes" :key="row.midi">
-            <td class="note">{{ row.name }}</td>
-            <td>{{ row.attempts }}</td>
-            <td>{{ fmt(row.avgMs) }}</td>
-            <td>{{ row.bestMs === null ? '—' : fmt(row.bestMs) }}</td>
-            <td :class="{ warn: row.hintRate > 0.5 }">{{ Math.round(row.hintRate * 100) }}%</td>
-          </tr>
-        </tbody>
-      </table>
-      <p class="hint">Sorted weakest first — most hints needed, then slowest.</p>
+      <div class="column">
+        <div v-if="session.rankedNotes.length" class="weakest">
+          <h3>Worth reviewing: {{ session.rankedNotes[0].name }}</h3>
+          <FingeringChart :midi="session.rankedNotes[0].midi" compact />
+        </div>
 
-      <div v-if="session.rankedNotes.length" class="weakest">
-        <h3>Worth reviewing: {{ session.rankedNotes[0].name }}</h3>
-        <FingeringChart :midi="session.rankedNotes[0].midi" compact />
+        <button class="reset" @click="session.reset()">Clear progress</button>
       </div>
-
-      <button class="reset" @click="session.reset()">Clear progress</button>
-    </template>
+    </div>
   </section>
 </template>
 
 <style scoped>
-.panel { display: flex; flex-direction: column; gap: 1rem; width: 100%; max-width: 640px; margin: 0 auto; }
+.panel { display: flex; flex-direction: column; gap: 1rem; }
+.dashboard {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: 1.25rem 2rem;
+  align-items: start;
+}
+.column { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
 h2 { margin: 0; font-size: 1rem; font-weight: 600; }
 .empty { font-size: 0.85rem; color: var(--ink-faint); line-height: 1.5; }
 .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
@@ -92,7 +108,9 @@ th { color: var(--ink-faint); font-weight: 500; font-size: 0.7rem; text-transfor
 td.note { font-weight: 600; }
 td.warn { color: var(--accent-warn); }
 .hint { margin: 0; font-size: 0.72rem; color: var(--ink-faint); }
-.weakest { border-top: 1px solid var(--line); padding-top: 0.9rem; }
+.weakest {
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 0.9rem;
+}
 .weakest h3 { margin: 0 0 0.6rem; font-size: 0.8rem; font-weight: 600; color: var(--ink-dim); }
 .reset {
   align-self: flex-start; padding: 0.5rem 0.8rem; font: inherit; font-size: 0.8rem;

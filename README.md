@@ -193,6 +193,7 @@ src/
 │   ├── fingeringFiles.js   note -> diagram filename
 │   ├── fingeringAssets.js  fetches and inlines the diagram files
 │   ├── songFiles.js        default-song filenames, URLs, seeding logic
+│   ├── staffLayout.js      bars per staff line, and their widths (unit-tested)
 │   └── exercise.js         exercise generation
 ├── audio/
 │   ├── detector.js     pure pitch analysis (unit-tested)
