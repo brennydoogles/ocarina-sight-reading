@@ -64,7 +64,7 @@ const mode = ref(null);
 
 <style scoped>
 .app {
-  max-width: 560px;
+  max-width: 1400px;
   margin: 0 auto;
   min-height: 100dvh;
   display: flex;

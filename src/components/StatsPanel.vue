@@ -73,7 +73,7 @@ const fmt = (ms) => (ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(m
 </template>
 
 <style scoped>
-.panel { display: flex; flex-direction: column; gap: 1rem; }
+.panel { display: flex; flex-direction: column; gap: 1rem; width: 100%; max-width: 640px; margin: 0 auto; }
 h2 { margin: 0; font-size: 1rem; font-weight: 600; }
 .empty { font-size: 0.85rem; color: var(--ink-faint); line-height: 1.5; }
 .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }

@@ -95,7 +95,7 @@ const s = useSettingsStore();
 </template>
 
 <style scoped>
-.panel { display: flex; flex-direction: column; gap: 1.25rem; }
+.panel { display: flex; flex-direction: column; gap: 1.25rem; width: 100%; max-width: 640px; margin: 0 auto; }
 h2 { margin: 0; font-size: 1rem; font-weight: 600; }
 .field { display: flex; flex-direction: column; gap: 0.4rem; }
 label { font-size: 0.85rem; color: var(--ink-dim); display: flex; justify-content: space-between; gap: 0.5rem; }

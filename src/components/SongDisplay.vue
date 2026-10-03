@@ -1,10 +1,12 @@
 <script setup>
-import { ref, shallowRef, watch, onMounted } from 'vue';
+import { ref, shallowRef, computed, watch, onMounted } from 'vue';
 // Same bundled-fonts entry as StaffDisplay.vue/PhraseDisplay.vue, for the
 // same reason: Bravura + Academico inlined as base64 so the PWA can draw a
 // staff offline. Do not switch to the default `vexflow` entry.
 import VexFlow from 'vexflow/bravura';
 import { toVexKey, noteName } from '../music/pitch.js';
+import { packLines, justifyLine } from '../music/staffLayout.js';
+import { useElementSize } from './useElementSize.js';
 
 const props = defineProps({
   /** @type {import('vue').PropType<import('../music/abc.js').AbcEvent[]>} */
@@ -32,13 +34,11 @@ const {
 const WINDOW_SIZE = 4;
 const ROW_HEIGHT = 150;
 const TOP_MARGIN = 70;
-const WIDTH = 320;
-const STAVE_MARGIN = 20; // matches new Stave(10, y, WIDTH - 20) elsewhere
-
-const BASE_BAR_WIDTH = 30;
-const PER_NOTE_WIDTH = 26;
-const CLEF_KEY_WIDTH = 70;
-const TIME_SIG_WIDTH = 25;
+/** On-screen pixels per SVG unit. The drawing is as wide as the box it sits
+ *  in divided by this, so a wider screen fits more bars at the same note
+ *  size rather than drawing the same bars bigger. */
+const NOTE_SCALE = 1;
+const STAVE_MARGIN = 20; // 10 units either side of each line
 
 const SHARP_KEYS = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#'];
 const FLAT_KEYS = ['C', 'F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb'];
@@ -54,6 +54,9 @@ const EPS = 1e-6;
 
 const host = ref(null);
 const fontsReady = shallowRef(false);
+const hostSize = useElementSize(host);
+/** Drawing width in SVG units; 0 until the host has been laid out. */
+const width = computed(() => Math.floor(hostSize.width.value / NOTE_SCALE));
 
 onMounted(async () => {
   try {
@@ -63,7 +66,11 @@ onMounted(async () => {
   draw();
 });
 
-watch(() => [props.notes, props.keySignature, props.meter, props.currentIndex, props.state], draw, { flush: 'post' });
+watch(
+  () => [props.notes, props.keySignature, props.meter, props.currentIndex, props.state, width.value],
+  draw,
+  { flush: 'post' },
+);
 
 /** The key signature's sharp/flat count and direction determine the
  *  standard major key with that exact accidental set -- true regardless of
@@ -117,41 +124,6 @@ function groupIntoBars(notes) {
   return bars;
 }
 
-function barWidth(bar, { isFirstInLine, isFirstOfPiece }) {
-  let w = BASE_BAR_WIDTH + bar.notes.length * PER_NOTE_WIDTH;
-  if (isFirstInLine) w += CLEF_KEY_WIDTH;
-  if (isFirstOfPiece) w += TIME_SIG_WIDTH;
-  return w;
-}
-
-/** Greedily packs bars into lines by an estimated width -- VexFlow's own
- *  Formatter then justifies each bar's notes to fill whatever width it's
- *  given, so this only has to be in the right ballpark, not exact. */
-function packLines(bars, lineWidthBudget) {
-  const lines = [];
-  let current = [];
-  let usedWidth = 0;
-  for (const bar of bars) {
-    const isFirstOfPiece = bar.index === 0;
-    if (current.length === 0) {
-      current.push(bar);
-      usedWidth = barWidth(bar, { isFirstInLine: true, isFirstOfPiece });
-      continue;
-    }
-    const widthIfContinuing = barWidth(bar, { isFirstInLine: false, isFirstOfPiece });
-    if (usedWidth + widthIfContinuing <= lineWidthBudget) {
-      current.push(bar);
-      usedWidth += widthIfContinuing;
-    } else {
-      lines.push(current);
-      current = [bar];
-      usedWidth = barWidth(bar, { isFirstInLine: true, isFirstOfPiece });
-    }
-  }
-  if (current.length > 0) lines.push(current);
-  return lines;
-}
-
 function lineIndexForNote(lines, globalIndex, totalNotes) {
   if (globalIndex >= totalNotes) return Math.max(0, lines.length - 1);
   for (let li = 0; li < lines.length; li += 1) {
@@ -164,18 +136,22 @@ function lineIndexForNote(lines, globalIndex, totalNotes) {
 }
 
 function draw() {
-  if (!fontsReady.value || !host.value) return;
+  // A zero width means the host is detached (KeepAlive) or not laid out yet:
+  // keep whatever was last drawn rather than redrawing at a bogus size.
+  if (!fontsReady.value || !host.value || width.value === 0) return;
   host.value.innerHTML = '';
   if (props.notes.length === 0) return;
 
+  const drawWidth = width.value;
+  const lineWidth = drawWidth - STAVE_MARGIN;
   const bars = groupIntoBars(props.notes);
-  const lines = packLines(bars, WIDTH - STAVE_MARGIN);
+  const lines = packLines(bars, lineWidth);
   const currentLine = lineIndexForNote(lines, props.currentIndex, props.notes.length);
   const windowLines = lines.slice(currentLine, currentLine + WINDOW_SIZE);
   const height = TOP_MARGIN + windowLines.length * ROW_HEIGHT;
 
   const renderer = new Renderer(host.value, Renderer.Backends.SVG);
-  renderer.resize(WIDTH, height);
+  renderer.resize(drawWidth, height);
   const ctx = renderer.getContext();
 
   const ink = getComputedStyle(host.value).getPropertyValue('--staff-ink').trim() || '#000';
@@ -192,12 +168,15 @@ function draw() {
 
   windowLines.forEach((line, li) => {
     const y = TOP_MARGIN + li * ROW_HEIGHT;
-    let x = 10;
+    let x = STAVE_MARGIN / 2;
+    const barWidths = justifyLine(line, lineWidth, {
+      isLastLine: lines.length > 1 && line === lines[lines.length - 1],
+    });
 
     line.forEach((bar, bi) => {
       const isFirstOfPiece = bar.index === 0;
-      const width = barWidth(bar, { isFirstInLine: bi === 0, isFirstOfPiece });
-      const stave = new Stave(x, y, width);
+      const barWidth = barWidths[bi];
+      const stave = new Stave(x, y, barWidth);
       if (bi === 0) {
         stave.addClef('treble');
         stave.addKeySignature(keyName);
@@ -229,13 +208,13 @@ function draw() {
       new Formatter().joinVoices([voice]).format([voice], fit - 20);
       voice.draw(ctx, stave);
 
-      x += width;
+      x += barWidth;
     });
   });
 
   const svg = host.value.querySelector('svg');
   if (svg) {
-    svg.setAttribute('viewBox', `0 0 ${WIDTH} ${height}`);
+    svg.setAttribute('viewBox', `0 0 ${drawWidth} ${height}`);
     svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
     svg.removeAttribute('width');
     svg.removeAttribute('height');
@@ -274,7 +253,6 @@ function getVar(name, fallback) {
 <style scoped>
 .staff-block {
   width: 100%;
-  max-width: 340px;
   margin: 0 auto;
 }
 .staff {
