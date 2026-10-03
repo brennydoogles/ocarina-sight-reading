@@ -118,7 +118,7 @@ describe('the diagram files on disk', () => {
 
   /**
    * How the artwork encodes hole state. Change this if the palette changes;
-   * an unrecognised fill fails loudly rather than being guessed at.
+   * an unrecognized fill fails loudly rather than being guessed at.
    */
   const FILL_STATE = { '#000000': HOLE_STATE.CLOSED, '#ffffff': HOLE_STATE.OPEN };
 
@@ -150,7 +150,7 @@ describe('the diagram files on disk', () => {
     }
   });
 
-  it('fill every hole with a colour that means something', () => {
+  it('fill every hole with a color that means something', () => {
     for (const midi of ALL_NOTES) {
       const doc = parse(midi).window.document;
       for (const hole of HOLE_IDS) {

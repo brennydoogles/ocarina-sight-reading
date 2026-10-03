@@ -78,7 +78,7 @@ function detectorFor(length) {
  */
 
 /**
- * Analyse one frame of audio.
+ * Analyze one frame of audio.
  *
  * The gates run cheapest-first, and each exists for a specific failure:
  * the noise gate stops room tone becoming phantom notes, the clarity gate
@@ -90,7 +90,7 @@ function detectorFor(length) {
  * @param {Partial<typeof DEFAULT_DETECTOR_CONFIG>} [config]
  * @returns {Reading}
  */
-export function analyseFrame(buffer, sampleRate, config = {}) {
+export function analyzeFrame(buffer, sampleRate, config = {}) {
   const { clarityThreshold, noiseGateDb } = { ...DEFAULT_DETECTOR_CONFIG, ...config };
 
   const level = rms(buffer);

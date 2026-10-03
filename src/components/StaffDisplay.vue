@@ -49,7 +49,7 @@ function draw() {
   ctx.setStrokeStyle(ink);
 
   // Generous vertical room: F6 sits on three ledger lines above the staff and
-  // A4 on one below, so the stave cannot be centred in the box.
+  // A4 on one below, so the stave cannot be centered in the box.
   const stave = new Stave(10, 70, width - 20);
   stave.addClef('treble');
   stave.setContext(ctx).draw();
@@ -62,12 +62,12 @@ function draw() {
   // VexFlow doesn't infer an accidental from the key string ("a#/4") -- a
   // sharp silently renders as a natural unless a modifier is attached.
   if (!isNatural(props.midi)) note.addModifier(new Accidental('#'), 0);
-  const colour = {
+  const color = {
     correct: getVar('--note-correct', '#3fb950'),
     wrong: getVar('--note-wrong', '#d98a3a'),
     holding: getVar('--note-holding', '#4a9eff'),
   }[props.state];
-  if (colour) note.setStyle({ fillStyle: colour, strokeStyle: colour });
+  if (color) note.setStyle({ fillStyle: color, strokeStyle: color });
 
   const voice = new Voice({ numBeats: 4, beatValue: 4 }).addTickables([note]);
   new Formatter().joinVoices([voice]).format([voice], width - 100);

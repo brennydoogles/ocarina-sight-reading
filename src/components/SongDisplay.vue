@@ -182,12 +182,12 @@ function draw() {
   ctx.setFillStyle(ink);
   ctx.setStrokeStyle(ink);
 
-  const colourFor = {
+  const colorFor = {
     correct: getVar('--note-correct', '#3fb950'),
     wrong: getVar('--note-wrong', '#d98a3a'),
     holding: getVar('--note-holding', '#4a9eff'),
   };
-  const doneColour = colourFor.correct;
+  const doneColor = colorFor.correct;
   const keyName = vexKeyName(props.keySignature);
 
   windowLines.forEach((line, li) => {
@@ -212,10 +212,10 @@ function draw() {
       const staveNotes = bar.notes.map((note, ni) => {
         const globalIndex = bar.startIndex + ni;
         const staveNote = buildStaveNote(note);
-        const colour = globalIndex === props.currentIndex ? colourFor[props.state]
-          : globalIndex < props.currentIndex ? doneColour
+        const color = globalIndex === props.currentIndex ? colorFor[props.state]
+          : globalIndex < props.currentIndex ? doneColor
             : null;
-        if (colour) staveNote.setStyle({ fillStyle: colour, strokeStyle: colour });
+        if (color) staveNote.setStyle({ fillStyle: color, strokeStyle: color });
         return staveNote;
       });
 
@@ -246,7 +246,7 @@ function draw() {
       : bars.find((b) => props.currentIndex >= b.startIndex && props.currentIndex < b.startIndex + b.notes.length)?.barNumber ?? 1;
     svg.setAttribute('aria-label', atEnd
       ? 'Song complete.'
-      : `Song, ${props.meter.num}/${props.meter.den} time, currently on bar ${currentBar}.`);
+      : `Song, ${props.meter.num}/${props.meter.den} time, currently on measure ${currentBar}.`);
   }
 }
 

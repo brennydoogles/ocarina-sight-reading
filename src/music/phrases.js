@@ -6,7 +6,7 @@
  * in both directions, nothing a player would meet in an actual tune. This
  * module builds phrases instead, out of two ingredients:
  *
- *  - a small library of recognisable melodic figures (scale runs, triads,
+ *  - a small library of recognizable melodic figures (scale runs, triads,
  *    turns, leap-then-resolve), expressed as steps through the note pool so
  *    they transpose to fit whatever range is in play;
  *  - a weighted random walk between figures, heavily biased toward steps,
@@ -36,8 +36,8 @@ const FIGURES = [
   [[0, -1, -2, -3], 8], // scale run down, 4 notes
   [[0, 1, 2, 3, 4], 5], // scale run up, 5 notes
   [[0, -1, -2, -3, -4], 5], // scale run down, 5 notes
-  [[0, 1, 0], 8], // upper neighbour, resolves back
-  [[0, -1, 0], 8], // lower neighbour, resolves back
+  [[0, 1, 0], 8], // upper neighbor, resolves back
+  [[0, -1, 0], 8], // lower neighbor, resolves back
   [[0, 1, 0, -1], 6], // turn: up, back, down
   [[0, -1, 0, 1], 6], // turn: down, back, up
   [[0, 2, 4], 4], // triad arpeggio up (root, third, fifth)
@@ -135,7 +135,7 @@ function pickFigure(random) {
 }
 
 /**
- * Generates a musical phrase: a mix of recognisable melodic figures and a
+ * Generates a musical phrase: a mix of recognizable melodic figures and a
  * step-biased random walk between them, drawn from the same practice-range
  * pool `generateExercise` uses.
  *

@@ -301,7 +301,7 @@ onUnmounted(() => {
             right pitch, held steady, and moves on whenever you're ready.
           </p>
           <label class="bar-field">
-            Start from bar
+            Start from measure
             <input v-model.number="startBar" type="number" min="1" :max="maxBar" />
           </label>
           <button class="primary" :disabled="mic.status.value === MIC.REQUESTING" @click="begin">
@@ -346,7 +346,7 @@ onUnmounted(() => {
 
         <div class="resume">
           <label class="bar-field">
-            Jump to bar
+            Jump to measure
             <input v-model.number="jumpBar" type="number" min="1" :max="maxBar" :disabled="listening" />
           </label>
           <button :disabled="listening" @click="jumpToBar(jumpBar)">Go</button>

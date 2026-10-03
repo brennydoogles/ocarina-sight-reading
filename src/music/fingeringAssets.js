@@ -17,7 +17,7 @@ const cache = new Map();
  * first-party files, but inlining is the one place where that assumption
  * becomes load-bearing, so strip the obvious vectors rather than rely on it.
  */
-function sanitise(svg) {
+function sanitize(svg) {
   for (const el of svg.querySelectorAll('script, foreignObject')) el.remove();
   for (const el of [svg, ...svg.querySelectorAll('*')]) {
     for (const attr of [...el.attributes]) {
@@ -57,7 +57,7 @@ async function fetchStem(stem) {
   if (svg.tagName.toLowerCase() !== 'svg') {
     throw new FingeringError('invalid', stem, 'the root element is not <svg>');
   }
-  return sanitise(svg);
+  return sanitize(svg);
 }
 
 function firstLineOf(text) {

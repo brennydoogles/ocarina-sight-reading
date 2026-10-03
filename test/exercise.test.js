@@ -87,7 +87,7 @@ describe('generateExercise', () => {
     expect(generateExercise({ low: 80, high: 70 })).toEqual([]);
   });
 
-  it('honours a requested length and avoids consecutive repeats within it', () => {
+  it('honors a requested length and avoids consecutive repeats within it', () => {
     const ex = generateExercise({ ...DEFAULTS, length: 8, random: makeSequence() });
     expect(ex).toHaveLength(8);
     for (let i = 1; i < ex.length; i += 1) {

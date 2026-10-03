@@ -114,7 +114,7 @@ export class SequenceMatcher {
   /**
    * Jumps to an arbitrary point in the sequence -- backs "resume from bar"
    * in Song Practice. Like `skip()`, nothing between the old and new
-   * position is credited or penalised; this just picks up somewhere else.
+   * position is credited or penalized; this just picks up somewhere else.
    * @param {number} index
    * @param {number} now
    */

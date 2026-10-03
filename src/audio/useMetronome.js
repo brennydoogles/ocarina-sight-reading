@@ -22,10 +22,10 @@ import { Metronome } from './metronome.js';
  * Click sound: a short, fast-decaying blip, deliberately pitched above the
  * instrument's detectable range (see DETECTABLE_MAX_HZ in notes.js, ~1480 Hz
  * for this instrument) so that even though the mic WILL pick up the click --
- * echoCancellation is off, see useMicrophone.js -- analyseFrame() rejects it
+ * echoCancellation is off, see useMicrophone.js -- analyzeFrame() rejects it
  * as READING.OUT_OF_RANGE rather than a candidate pitch. The ~15 ms decay is
  * also far short of the matcher's sustain requirement (200 ms by default),
- * a second line of defence if the pitch ever were read as something.
+ * a second line of defense if the pitch ever were read as something.
  */
 const SCHEDULE_INTERVAL_MS = 25;
 const LOOK_AHEAD_SEC = 0.1;

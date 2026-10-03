@@ -30,7 +30,7 @@ describe('generatePhrase', () => {
     }
   });
 
-  it('honours a requested length', () => {
+  it('honors a requested length', () => {
     const phrase = generatePhrase({ ...DEFAULTS, length: 20, random: makeSequence() });
     expect(phrase).toHaveLength(20);
   });

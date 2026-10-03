@@ -50,7 +50,7 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* VexFlow draws with explicit fills; make sure nothing inherits a stray colour. */
+/* VexFlow draws with explicit fills; make sure nothing inherits a stray color. */
 svg text { font-family: inherit; }
 
 button { -webkit-tap-highlight-color: transparent; }

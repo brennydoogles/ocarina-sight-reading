@@ -10,14 +10,14 @@ import StatsPanel from './components/StatsPanel.vue';
 import FingeringReference from './components/FingeringReference.vue';
 
 const TABS = [
-  { id: 'practice', label: 'Practise' },
+  { id: 'practice', label: 'Practice' },
   { id: 'reference', label: 'Fingerings' },
   { id: 'stats', label: 'Progress' },
   { id: 'settings', label: 'Settings' },
 ];
 const tab = ref('practice');
 
-/** Selected practice mode, or null for the Practise tab's picker screen. */
+/** Selected practice mode, or null for the Practice tab's picker screen. */
 const mode = ref(null);
 </script>
 

@@ -64,7 +64,7 @@ export const useSongsStore = defineStore('songs', () => {
    * already here.
    * @param {string} json
    * @returns {number} how many songs were imported
-   * @throws {Error} if `json` is not a recognisable export
+   * @throws {Error} if `json` is not a recognizable export
    */
   function importJson(json) {
     const parsed = JSON.parse(json);

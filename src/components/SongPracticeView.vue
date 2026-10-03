@@ -198,7 +198,7 @@ onUnmounted(() => {
             <p class="song-date">Added {{ formatDate(song.addedAt) }}</p>
           </div>
           <div class="song-actions">
-            <button class="primary" @click="startPractice(song)">Practise</button>
+            <button class="primary" @click="startPractice(song)">Practice</button>
             <button @click="startEdit(song)">Edit</button>
             <button
               class="danger"
@@ -238,7 +238,7 @@ onUnmounted(() => {
           <p v-else class="status error">This tune can't be played yet:</p>
 
           <p v-if="validation.needsAccidentals" class="hint">
-            This tune needs semitones — some notes aren't naturals.
+            This tune needs sharps or flats — some notes aren't naturals.
           </p>
 
           <ul v-if="validation.issues.length > 0" class="issues">
@@ -246,9 +246,9 @@ onUnmounted(() => {
               {{ issue.message }}
               <ul v-if="issue.notes" class="issue-notes">
                 <li v-for="(n, j) in issue.notes" :key="j">
-                  Bar {{ n.bar }}: {{ n.name }}
-                  <span v-if="n.semitonesOver">, {{ n.semitonesOver }} semitone{{ n.semitonesOver === 1 ? '' : 's' }} above the top note</span>
-                  <span v-if="n.semitonesUnder">, {{ n.semitonesUnder }} semitone{{ n.semitonesUnder === 1 ? '' : 's' }} below the bottom note</span>
+                  Measure {{ n.bar }}: {{ n.name }}
+                  <span v-if="n.semitonesOver">, {{ n.semitonesOver }} half step{{ n.semitonesOver === 1 ? '' : 's' }} above the top note</span>
+                  <span v-if="n.semitonesUnder">, {{ n.semitonesUnder }} half step{{ n.semitonesUnder === 1 ? '' : 's' }} below the bottom note</span>
                 </li>
               </ul>
             </li>
@@ -256,7 +256,7 @@ onUnmounted(() => {
 
           <button v-if="validation.transposition" class="transpose" @click="acceptTransposition">
             Transpose {{ Math.abs(validation.transposition.semitones) }}
-            semitone{{ Math.abs(validation.transposition.semitones) === 1 ? '' : 's' }}
+            half step{{ Math.abs(validation.transposition.semitones) === 1 ? '' : 's' }}
             {{ validation.transposition.direction }} to fit
           </button>
         </template>

@@ -176,7 +176,7 @@ onUnmounted(stop);
           whether you got it. If you’re stuck, the fingering appears.
         </p>
         <button class="primary" :disabled="mic.status.value === MIC.REQUESTING" @click="begin">
-          {{ mic.status.value === MIC.REQUESTING ? 'Waiting for microphone…' : 'Start practising' }}
+          {{ mic.status.value === MIC.REQUESTING ? 'Waiting for microphone…' : 'Start practicing' }}
         </button>
         <p v-if="pool.length === 0" class="error">
           The practice range contains no notes. Widen it in Settings.

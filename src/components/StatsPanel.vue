@@ -12,7 +12,7 @@ const fmt = (ms) => (ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(m
     <h2>Progress</h2>
 
     <div v-if="session.completed === 0" class="empty">
-      Nothing practised yet. Play a few notes and per-note timings show up here.
+      Nothing practiced yet. Play a few notes and per-note timings show up here.
     </div>
 
     <template v-else>

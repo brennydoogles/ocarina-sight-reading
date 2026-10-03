@@ -13,7 +13,7 @@ const LEGACY_STORAGE_KEY = 'ocarina.stats.v1';
 
 /**
  * Per-note practice statistics, persisted so progress survives a reload.
- * Also tracks the current streak, which is the bit that makes practising
+ * Also tracks the current streak, which is the bit that makes practicing
  * faintly addictive.
  *
  * Per-note stats (`stats`) are shared across every mode -- "my weakest

@@ -82,14 +82,14 @@ function draw() {
   ctx.setFillStyle(ink);
   ctx.setStrokeStyle(ink);
 
-  const colourFor = {
+  const colorFor = {
     correct: getVar('--note-correct', '#3fb950'),
     wrong: getVar('--note-wrong', '#d98a3a'),
     holding: getVar('--note-holding', '#4a9eff'),
   };
   /** Every note already played correctly reads as done, in the same green
    *  the current note gets on success -- the phrase so far, at a glance. */
-  const doneColour = colourFor.correct;
+  const doneColor = colorFor.correct;
 
   let globalIndex = 0;
   bars.forEach((bar, barIndex) => {
@@ -111,10 +111,10 @@ function draw() {
       });
       if (!isNatural(note.midi)) staveNote.addModifier(new Accidental('#'), 0);
 
-      const colour = i === props.currentIndex ? colourFor[props.state]
-        : i < props.currentIndex ? doneColour
+      const color = i === props.currentIndex ? colorFor[props.state]
+        : i < props.currentIndex ? doneColor
           : null;
-      if (colour) staveNote.setStyle({ fillStyle: colour, strokeStyle: colour });
+      if (color) staveNote.setStyle({ fillStyle: color, strokeStyle: color });
       return staveNote;
     });
 

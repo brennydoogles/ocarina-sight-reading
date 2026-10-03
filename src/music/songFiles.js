@@ -70,7 +70,7 @@ export function initialSeededFilenames(libraryExists) {
 }
 
 /**
- * Humanises a `.abc` filename into a fallback title, for a tune with no
+ * Humanizes a `.abc` filename into a fallback title, for a tune with no
  * `T:` field of its own: strip the extension, turn underscores into spaces,
  * title-case each word. `"ode_to_joy.abc"` -> `"Ode To Joy"`.
  * @param {string} filename

@@ -25,7 +25,7 @@ export const DETECTABLE_MAX_HZ = midiToHz(INSTRUMENT_HIGH + 1);
  * Every note this app drills: the naturals from A4 to F6 by default.
  *
  * The instrument itself is fully chromatic across that span, and the detector
- * always recognises accidentals so that playing one reads as a wrong note
+ * always recognizes accidentals so that playing one reads as a wrong note
  * rather than as noise -- see DETECTABLE_MIN_HZ above. `includeAccidentals`
  * only controls whether they show up here, in the exercise pool and the
  * fingering data.

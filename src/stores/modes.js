@@ -9,7 +9,7 @@ export { PRACTICE_MODES };
 /**
  * Per-mode practice options -- separate from src/stores/settings.js, which
  * keeps the cross-cutting concerns (practice range, tolerance, sustain, hint
- * behaviour). A semitone preference is per-mode: Single Note and Multi-Note
+ * behavior). A semitone preference is per-mode: Single Note and Multi-Note
  * drills each need their own, so this store namespaces every option by mode
  * rather than sharing one flag across all four.
  */

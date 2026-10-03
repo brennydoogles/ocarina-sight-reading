@@ -74,7 +74,7 @@ function render(midi, baseSvg) {
     if (state === HOLE_STATE.HALF) {
       // base.svg has no half-filled hole to derive from, and the table never
       // produces HALF today -- see fingerings.js for why. Fail loudly rather
-      // than silently emitting an unrecognised third colour.
+      // than silently emitting an unrecognized third color.
       throw new Error(`${noteName(midi)}: HOLE_STATE.HALF has no drawing to derive (hole ${hole})`);
     }
     return setFill(el, state === HOLE_STATE.CLOSED ? '#000000' : '#ffffff');

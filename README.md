@@ -8,7 +8,7 @@ at the end of it. Naming the note answers "which note is that?" and leaves
 "how do I play it?" to you — the half worth struggling with.
 
 Covers the **thirteen naturals from A4 to F6**. Sharps and flats are out of
-scope for now — the detector still recognises them, so playing one reads as a
+scope for now — the detector still recognizes them, so playing one reads as a
 wrong note rather than as noise, but they are not drilled and have no diagrams.
 
 Vue 3 + Vite, plain JavaScript, installable as a PWA.
@@ -24,7 +24,7 @@ This app is built with tools that run on **Node.js**. Installing Node also
 installs **npm**, the command used below — you do not install npm separately,
 and there is no separate npm version to pick.
 
-Go to **[nodejs.org](https://nodejs.org)** and download the version labelled
+Go to **[nodejs.org](https://nodejs.org)** and download the version labeled
 **LTS** (the big button on the left — "LTS" means Long Term Support, the stable
 one). Run the installer and accept the defaults.
 
@@ -116,7 +116,7 @@ npm install && npm run dev
 
 Then open http://localhost:5173.
 
-**To practise on your phone**, the app must be served over HTTPS — browsers only
+**To practice on your phone**, the app must be served over HTTPS — browsers only
 grant microphone access in a secure context, and `http://<your-ip>:5173` is not
 one. Use:
 
@@ -157,7 +157,7 @@ Four gates run cheapest-first, each for a specific failure:
 
 - **Noise gate** — stops room tone becoming phantom notes.
 - **Clarity gate** — pitchy's confidence score; stops breath and handling noise.
-- **Range guard** — rejects anything outside A4–F6 ± a semitone. Autocorrelation's
+- **Range guard** — rejects anything outside A4–F6 ± a half step. Autocorrelation's
   characteristic mistake is an octave-down subharmonic, and this catches it.
 - **Sustain** — the note must stay in tune for ~200 ms. Without this a note gets
   credited in passing as you slide through it, which teaches nothing.
@@ -180,7 +180,7 @@ detector does hear the click** through the device speaker. It is pitched above
 `DETECTABLE_MAX_HZ` on purpose, so the range guard above rejects it as
 out-of-range rather than a candidate pitch, and its ~15 ms decay is far
 shorter than the sustain gate's ~200 ms requirement as a second line of
-defence.
+defense.
 
 ## Layout
 
@@ -241,13 +241,13 @@ they follow, which the test suite relies on:
   check each drawing against the fingering table.
 
 Together those give a real safety net: `npm test` asserts every diagram draws
-each of its twelve holes in the state the table calls for, so a mis-coloured
+each of its twelve holes in the state the table calls for, so a mis-colored
 hole fails the suite by name (`D5: rightPinky is drawn closed, table says
 open`) rather than quietly teaching the wrong fingering. If the palette
 changes, update `FILL_STATE` in `test/fingering-files.test.js`.
 
 Optionally, `var(--ink)` and `var(--surface)` follow the app's light/dark theme,
-because files are inlined rather than loaded as `<img>`. Hardcoded colours work
+because files are inlined rather than loaded as `<img>`. Hardcoded colors work
 fine too; they just look the same in both themes.
 
 While iterating, the **Fingerings** tab has a *Reload diagrams* button that
@@ -289,7 +289,7 @@ Drop a new file in there and it appears in every player's library on their
 next load, with no code change.
 
 - The title shown is the tune's own `T:` field, not the filename. A file with
-  no `T:` falls back to the filename humanised (`ode_to_joy` -> "Ode To Joy").
+  no `T:` falls back to the filename humanized (`ode_to_joy` -> "Ode To Joy").
 - The file must fit the instrument's **A4-F6** range, and be a single
   melodic line (no chords, extra voices, or quarter-tones), or it's skipped
   with a console warning rather than breaking anyone's library. Paste the

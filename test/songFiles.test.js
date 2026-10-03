@@ -66,7 +66,7 @@ describe('URLs', () => {
     expect(songFileUrl('a.abc', '/')).toBe(`/${SONGS_DIR}/a.abc`);
   });
 
-  it('honours a non-root base without a trailing double slash', () => {
+  it('honors a non-root base without a trailing double slash', () => {
     expect(songManifestUrl('/app/')).toBe(`/app/${SONGS_DIR}/${MANIFEST_FILENAME}`);
     expect(songFileUrl('a.abc', '/app/')).toBe(`/app/${SONGS_DIR}/a.abc`);
   });
