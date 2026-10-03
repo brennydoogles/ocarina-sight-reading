@@ -37,6 +37,8 @@ async function onTabKeydown(event) {
 
 /** Selected practice mode, or null for the Practice tab's picker screen. */
 const mode = ref(null);
+
+const currentYear = new Date().getFullYear();
 </script>
 
 <template>
@@ -84,6 +86,11 @@ const mode = ref(null);
       <FingeringReference v-if="tab === 'reference'" />
       <StatsPanel v-if="tab === 'stats'" />
       <SettingsPanel v-if="tab === 'settings'" />
+
+      <footer>
+        Copyright Brendon Dugan {{ currentYear }}
+        <a href="https://www.brendondugan.com">www.brendondugan.com</a>
+      </footer>
     </main>
   </div>
 </template>
@@ -123,6 +130,15 @@ main {
   border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-dim);
   border-radius: 8px;
 }
+
+footer {
+  margin-top: auto;
+  padding-top: 1.5rem;
+  text-align: center;
+  font-size: 0.7rem;
+  color: var(--ink-faint);
+}
+footer a { color: inherit; }
 
 /* Phones: a sticky bottom bar of filled buttons, in thumb reach. */
 nav {
