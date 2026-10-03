@@ -1,9 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#1b1d23"/>
-  <ellipse cx="30" cy="34" rx="21" ry="15" fill="none" stroke="#e8eaed" stroke-width="3"/>
-  <path d="M50 30 l7-3 v9 l-7-3z" fill="#e8eaed"/>
-  <circle cx="21" cy="32" r="3.2" fill="#e8eaed"/>
-  <circle cx="30" cy="29" r="3.2" fill="#e8eaed"/>
-  <circle cx="39" cy="32" r="3.2" fill="none" stroke="#e8eaed" stroke-width="2"/>
-  <circle cx="30" cy="40" r="2" fill="#e8eaed"/>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!--
+  App icon, cropped from public/fingerings/12_hole/base.svg (the hand-drawn
+  ocarina artwork fingering diagrams are rendered from) to its bounding box
+  and framed in a square with the app's theme background. Keep this in sync
+  by hand if base.svg's body, holes, or decoration ever change: there is no
+  build step wiring the two together.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="102.58 -326.03 1735.02 1735.02">
+  <rect x="102.58" y="-326.03" width="1735.02" height="1735.02" rx="380" ry="380" fill="#1b1d23"/>
+  <path
+     style="opacity:1;fill:#253381;fill-opacity:1;stroke:#0a0e1e;stroke-width:4.8e-07;stroke-dasharray:none;stroke-opacity:1;paint-order:fill markers stroke"
+     d="m 416.46274,85.428254 c 0,0 670.61176,-83.2925477 1166.09566,10.678531 64.0712,14.949945 341.713,100.378195 93.9711,234.927695 -175.1279,85.42826 -668.4761,271.23471 -668.4761,271.23471 0,0 -164.4494,70.47831 -345.98443,277.64182 -46.98554,55.52837 -115.32815,128.14239 -115.32815,128.14239 0,0 -23.49277,44.8498 -70.47831,10.6785 -53.39265,-29.89986 -106.78531,-68.34258 -106.78531,-68.34258 0,0 -23.49277,-61.93548 4.27141,-76.88543 19.22136,-32.03559 53.39266,-153.77085 53.39266,-153.77085 0,0 -2.13571,-98.24249 -91.83537,-158.04227 C 252.01335,491.21246 -49.121246,252.01335 416.46274,85.428254 Z" />
+  <g>
+    <ellipse style="opacity:1;fill:#ffffff;fill-opacity:1;stroke:#0a0e1e;stroke-width:6;stroke-dasharray:none;stroke-opacity:1;paint-order:fill markers stroke" cx="291.52393" cy="294.72748" rx="50.188999" ry="49.121246" />
+    <ellipse style="opacity:1;fill:#ffffff;fill-opacity:1;stroke:#0a0e1e;stroke-width:6;stroke-dasharray:none;stroke-opacity:1;paint-order:fill markers stroke" cx="480.53394" cy="280.8454" rx="74.75" ry="73.68187" />
+    <ellipse style="opacity:1;fill:#ffffff;fill-opacity:1;stroke:#0a0e1e;stroke-width:6;stroke-dasharray:none;stroke-opacity:1;paint-order:fill markers stroke" cx="658.86542" cy="238.13126" rx="63.002998" ry="63.003338" />
+    <ellipse style="opacity:1;fill:#ffffff;fill-opacity:1;stroke:#0a0e1e;stroke-width:6;stroke-dasharray:none;stroke-opacity:1;paint-order:fill markers stroke" cx="839.33258" cy="183.67075" rx="55.528" ry="57.66407" />
+    <ellipse style="opacity:1;fill:#ffffff;fill-opacity:1;stroke:#0a0e1e;stroke-width:6;stroke-dasharray:none;stroke-opacity:1;paint-order:fill markers stroke" cx="513.63739" cy="383.35928" rx="20.289" ry="18.153503" />
+    <ellipse style="opacity:1;fill:#ffffff;fill-opacity:1;stroke:#0a0e1e;stroke-width:6;stroke-dasharray:none;stroke-opacity:1;paint-order:fill markers stroke" cx="932.23584" cy="501.89099" rx="43.782001" ry="44.849834" />
+    <ellipse style="opacity:1;fill:#ffffff;fill-opacity:1;stroke:#0a0e1e;stroke-width:6;stroke-dasharray:none;stroke-opacity:1;paint-order:fill markers stroke" cx="1113.7709" cy="363.07007" rx="35.238998" ry="36.307007" />
+    <ellipse style="opacity:1;fill:#ffffff;fill-opacity:1;stroke:#0a0e1e;stroke-width:6;stroke-dasharray:none;stroke-opacity:1;paint-order:fill markers stroke" cx="1081.7352" cy="287.2525" rx="18.153999" ry="18.153503" />
+    <ellipse style="opacity:1;fill:#ffffff;fill-opacity:1;stroke:#0a0e1e;stroke-width:6;stroke-dasharray:none;stroke-opacity:1;paint-order:fill markers stroke" cx="1282.4917" cy="274.43826" rx="41.646" ry="41.646275" />
+    <ellipse style="opacity:1;fill:#ffffff;fill-opacity:1;stroke:#0a0e1e;stroke-width:6;stroke-dasharray:none;stroke-opacity:1;paint-order:fill markers stroke" cx="1464.0267" cy="233.85985" rx="30.968" ry="30.967741" />
+    <ellipse style="opacity:1;fill:#ffffff;fill-opacity:1;stroke:#0a0e1e;stroke-width:6;stroke-dasharray:none;stroke-opacity:1;paint-order:fill markers stroke" cx="278.70969" cy="808.36487" rx="56.596001" ry="56.596218" />
+    <ellipse style="opacity:1;fill:#ffffff;fill-opacity:1;stroke:#0a0e1e;stroke-width:6;stroke-dasharray:none;stroke-opacity:1;paint-order:fill markers stroke" cx="893.79309" cy="808.36487" rx="56.596001" ry="56.596218" />
+  </g>
+  <g transform="rotate(-147.97052,981.56273,931.71306)">
+    <path style="opacity:1;fill:#a3901c;fill-opacity:1;stroke:#0a0e1e;stroke-width:6;stroke-dasharray:none;stroke-opacity:1;paint-order:fill markers stroke" d="m 1419.3546,815.92183 -48.2311,0 -48.231,0 24.1155,-41.76931 24.1155,-41.76931 24.1156,41.76931 z" />
+    <path style="opacity:1;fill:#a3901c;fill-opacity:1;stroke:#0a0e1e;stroke-width:6;stroke-dasharray:none;stroke-opacity:1;paint-order:fill markers stroke" d="m 1419.3546,815.92183 -48.2311,0 -48.231,0 24.1155,-41.76931 24.1155,-41.76931 24.1156,41.76931 z" transform="translate(93.971079)" />
+    <path style="opacity:1;fill:#a3901c;fill-opacity:1;stroke:#0a0e1e;stroke-width:6;stroke-dasharray:none;stroke-opacity:1;paint-order:fill markers stroke" d="m 1419.3546,815.92183 -48.2311,0 -48.231,0 24.1155,-41.76931 24.1155,-41.76931 24.1156,41.76931 z" transform="translate(46.98554,-81.156841)" />
+  </g>
 </svg>
