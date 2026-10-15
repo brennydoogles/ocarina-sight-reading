@@ -124,6 +124,9 @@ function keyAccidentalTable(keySignature) {
  * @property {number} startTime cumulative offset before this event, in
  *   whole-note fractions -- what a playback engine seeks to for "play from
  *   here" (see src/music/playback.js)
+ * @property {number} [startChar] offset of this event in the ABC source --
+ *   how playback maps the synth's own (repeat-expanded) note order back
+ *   onto these events (see buildPlaybackTimeline in src/music/playback.js)
  */
 
 /**
@@ -186,6 +189,11 @@ export async function parseAbc(source) {
   const barAccidentals = new Map();
   const notes = [];
   let bar = 1;
+  // Whether the current measure has had a note or rest yet. A bar line only
+  // starts a new measure if it closes one that had something in it -- so a
+  // tune that opens with `|:` still starts at measure 1, and a line that
+  // ends with `|` followed by one that starts with `|` doesn't skip a number.
+  let barHasEvents = false;
   // Cumulative offset, in whole-note fractions, of each event's start --
   // what a playback engine needs to seek to "start from this note" without
   // having to re-derive the tune's own timing math itself.
@@ -205,16 +213,20 @@ export async function parseAbc(source) {
         if ((typeof elem.type === 'string' && elem.type.includes('repeat')) || elem.startEnding || elem.endEnding) {
           features.hasRepeats = true;
         }
-        bar += 1;
+        if (barHasEvents) {
+          bar += 1;
+          barHasEvents = false;
+        }
         continue;
       }
       if (elem.el_type !== 'note') continue; // clefs, part markers, etc. -- nothing to resolve
 
       if (elem.gracenotes) features.hasGraceNotes = true;
+      barHasEvents = true;
 
       if (elem.rest) {
         notes.push({
-          isRest: true, midi: null, duration: elem.duration, bar, startTime,
+          isRest: true, midi: null, duration: elem.duration, bar, startTime, startChar: elem.startChar,
         });
         startTime += elem.duration;
         continue;
@@ -244,6 +256,7 @@ export async function parseAbc(source) {
         // after the forEach, not once per pitch.
         notes.push({
           isRest: false, midi, flats: delta < 0, duration: elem.duration, bar, chord: i > 0, startTime,
+          startChar: elem.startChar,
         });
       });
       startTime += elem.duration;
@@ -339,7 +352,7 @@ export async function validateSong(source, { instrument } = {}) {
     issues.push({ severity: 'warning', code: 'grace-notes', message: 'This tune has grace notes. They will be ignored.' });
   }
   if (parsed.features.hasRepeats) {
-    issues.push({ severity: 'warning', code: 'repeats', message: 'This tune has repeats or endings. It will be practiced straight through, once.' });
+    issues.push({ severity: 'warning', code: 'repeats', message: 'This tune has repeats or endings. Play-along goes straight through once; Listen plays the repeats.' });
   }
 
   const pitched = parsed.notes.filter((n) => !n.isRest);

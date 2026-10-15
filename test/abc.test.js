@@ -105,6 +105,28 @@ describe('parseAbc', () => {
     expect(parsed.features.hasGraceNotes).toBe(true);
   });
 
+  it('numbers measures from 1', async () => {
+    const parsed = await parseAbc(tune('A B | c d | e'));
+    expect(parsed.notes.map((n) => n.bar)).toEqual([1, 1, 2, 2, 3]);
+  });
+
+  it('still starts at measure 1 when the tune opens with a bar line', async () => {
+    const plain = await parseAbc('X:1\nL:1/4\nK:C\n| A B | c |]\n');
+    expect(plain.notes.map((n) => n.bar)).toEqual([1, 1, 2]);
+    const repeat = await parseAbc('X:1\nL:1/4\nK:C\n|: A B :| c |]\n');
+    expect(repeat.notes.map((n) => n.bar)).toEqual([1, 1, 2]);
+  });
+
+  it('does not skip a measure number where one line ends and the next starts with a bar line', async () => {
+    const parsed = await parseAbc('X:1\nL:1/4\nK:C\n| A B |\n| c d |\n|: e f :|]\n');
+    expect(parsed.notes.map((n) => n.bar)).toEqual([1, 1, 2, 2, 3, 3]);
+  });
+
+  it('counts a measure of rests as a measure', async () => {
+    const parsed = await parseAbc(tune('A B | z2 | c'));
+    expect(parsed.notes.map((n) => n.bar)).toEqual([1, 1, 2, 3]);
+  });
+
   it('flags repeats and endings', async () => {
     const parsed = await parseAbc('X:1\nK:C\n|: A B :|1 C D |2 E F |]\n');
     expect(parsed.features.hasRepeats).toBe(true);

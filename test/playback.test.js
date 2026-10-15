@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
-  scaleTempo, secondsPerWholeNote, secondsForNoteIndex, noteDurationSeconds,
-  MIN_TEMPO_PERCENT, MAX_TEMPO_PERCENT,
+  scaleTempo, secondsPerWholeNote, noteDurationSeconds, linearTimeline, buildPlaybackTimeline,
+  noteIndexAtTime, timeForNoteIndex, MIN_TEMPO_PERCENT, MAX_TEMPO_PERCENT,
 } from '../src/music/playback.js';
+import { parseAbc, loadAbcjs } from '../src/music/abc.js';
 
 const note = (startTime, duration) => ({
   isRest: false, midi: 69, flats: false, duration, bar: 1, chord: false, startTime,
@@ -61,28 +62,134 @@ describe('secondsPerWholeNote', () => {
   });
 });
 
-describe('secondsForNoteIndex', () => {
+describe('linearTimeline + timeForNoteIndex', () => {
   const notes = [note(0, 0.25), note(0.25, 0.25), note(0.5, 0.5)];
-  const meter = { num: 4, den: 4 };
-  const msPerMeasure = 2000; // 2 seconds per whole note
 
-  it('resolves to a note\'s own start time, in seconds', () => {
-    expect(secondsForNoteIndex(notes, 0, msPerMeasure, meter)).toBeCloseTo(0, 9);
-    expect(secondsForNoteIndex(notes, 1, msPerMeasure, meter)).toBeCloseTo(0.5, 9);
-    expect(secondsForNoteIndex(notes, 2, msPerMeasure, meter)).toBeCloseTo(1, 9);
+  it('resolves to a note\'s own start time, in whole notes', () => {
+    const timeline = linearTimeline(notes);
+    expect(timeForNoteIndex(timeline, notes, 0)).toBeCloseTo(0, 9);
+    expect(timeForNoteIndex(timeline, notes, 1)).toBeCloseTo(0.25, 9);
+    expect(timeForNoteIndex(timeline, notes, 2)).toBeCloseTo(0.5, 9);
   });
 
   it('resolves an out-of-range index to the tune\'s end', () => {
-    const end = secondsForNoteIndex(notes, 99, msPerMeasure, meter);
-    expect(end).toBeCloseTo(2, 9); // last note starts at 0.5, lasts 0.5 -> ends at 1.0 whole notes = 2s
+    expect(timeForNoteIndex(linearTimeline(notes), notes, 99)).toBeCloseTo(1, 9);
   });
 
   it('clamps a negative index to the start', () => {
-    expect(secondsForNoteIndex(notes, -5, msPerMeasure, meter)).toBeCloseTo(0, 9);
+    expect(timeForNoteIndex(linearTimeline(notes), notes, -5)).toBeCloseTo(0, 9);
   });
 
   it('returns 0 for an empty note list', () => {
-    expect(secondsForNoteIndex([], 0, msPerMeasure, meter)).toBe(0);
+    expect(timeForNoteIndex(linearTimeline([]), [], 0)).toBe(0);
+  });
+});
+
+describe('buildPlaybackTimeline', () => {
+  /** Notes with source offsets 10, 20, 30... so played events can name them. */
+  const withChars = (specs) => specs.map(([startTime, duration, isRest = false], i) => ({
+    ...note(startTime, duration), isRest, midi: isRest ? null : 69, startChar: (i + 1) * 10,
+  }));
+  const ev = (start, startChar) => ({ start, startChar });
+  const indices = (timeline) => timeline.map((e) => e.index);
+
+  it('matches the linear timeline for a tune played straight through', () => {
+    const notes = withChars([[0, 0.25], [0.25, 0.25], [0.5, 0.5]]);
+    const played = [ev(0, 10), ev(0.25, 20), ev(0.5, 30)];
+    expect(buildPlaybackTimeline(notes, played)).toEqual(linearTimeline(notes));
+  });
+
+  it('follows a repeat back to its start', () => {
+    // |: A B :| C
+    const notes = withChars([[0, 0.25], [0.25, 0.25], [0.5, 0.25]]);
+    const played = [ev(0, 10), ev(0.25, 20), ev(0.5, 10), ev(0.75, 20), ev(1, 30)];
+    const timeline = buildPlaybackTimeline(notes, played);
+    expect(indices(timeline)).toEqual([0, 1, 0, 1, 2]);
+    expect(timeline.map((e) => e.time)).toEqual([0, 0.25, 0.5, 0.75, 1]);
+  });
+
+  it('takes the right ending on each pass', () => {
+    // |: A :|1 B :|2 C |]
+    const notes = withChars([[0, 0.25], [0.25, 0.25], [0.5, 0.25]]);
+    const played = [ev(0, 10), ev(0.25, 20), ev(0.5, 10), ev(0.75, 30)];
+    expect(indices(buildPlaybackTimeline(notes, played))).toEqual([0, 1, 0, 2]);
+  });
+
+  it('fills in leading, inner and trailing rests', () => {
+    // z A z B z
+    const notes = withChars([[0, 0.25, true], [0.25, 0.25], [0.5, 0.25, true], [0.75, 0.25], [1, 0.25, true]]);
+    const played = [ev(0.25, 20), ev(0.75, 40)];
+    expect(buildPlaybackTimeline(notes, played)).toEqual(linearTimeline(notes));
+  });
+
+  it('fills in a rest at the end of a repeated section without running past the jump back', () => {
+    // |: A z :| B
+    const notes = withChars([[0, 0.25], [0.25, 0.25, true], [0.5, 0.25]]);
+    const played = [ev(0, 10), ev(0.5, 10), ev(1, 30)];
+    const timeline = buildPlaybackTimeline(notes, played);
+    expect(indices(timeline)).toEqual([0, 1, 0, 1, 2]);
+    expect(timeline.map((e) => e.time)).toEqual([0, 0.25, 0.5, 0.75, 1]);
+  });
+
+  it('fills in the second half of a tie, which the synth merges into the first', () => {
+    // A- A B
+    const notes = withChars([[0, 0.25], [0.25, 0.25], [0.5, 0.25]]);
+    const played = [ev(0, 10), ev(0.5, 30)];
+    expect(buildPlaybackTimeline(notes, played)).toEqual(linearTimeline(notes));
+  });
+
+  it('skips events it cannot place, such as grace notes', () => {
+    const notes = withChars([[0, 0.25], [0.25, 0.25]]);
+    const played = [{ start: 0 }, ev(0.0625, 10), ev(0.25, 20)];
+    expect(indices(buildPlaybackTimeline(notes, played))).toEqual([0, 1]);
+  });
+
+  it('falls back to the linear timeline when nothing can be matched', () => {
+    const notes = withChars([[0, 0.25], [0.25, 0.25]]);
+    expect(buildPlaybackTimeline(notes, [])).toEqual(linearTimeline(notes));
+    expect(buildPlaybackTimeline(notes, [ev(0, 999)])).toEqual(linearTimeline(notes));
+    expect(buildPlaybackTimeline(notes, undefined)).toEqual(linearTimeline(notes));
+  });
+
+  it('seeks to a repeated note\'s first pass', () => {
+    const notes = withChars([[0, 0.25], [0.25, 0.25], [0.5, 0.25]]);
+    const played = [ev(0, 10), ev(0.25, 20), ev(0.5, 10), ev(0.75, 20), ev(1, 30)];
+    const timeline = buildPlaybackTimeline(notes, played);
+    expect(timeForNoteIndex(timeline, notes, 1)).toBeCloseTo(0.25, 9);
+    expect(timeForNoteIndex(timeline, notes, 2)).toBeCloseTo(1, 9);
+    expect(timeForNoteIndex(timeline, notes, 3)).toBeCloseTo(1.25, 9);
+  });
+
+  it('lines up with real abcjs output for a tune with repeats and endings', async () => {
+    const src = 'X:1\nL:1/4\nK:C\n|: A z :|1 B c :|2 d- d e |]\n';
+    const { notes } = await parseAbc(src);
+    const abcjs = await loadAbcjs();
+    const played = abcjs.parseOnly(src)[0].setUpAudio({}).tracks
+      .flat().filter((e) => e.cmd === 'note');
+    const timeline = buildPlaybackTimeline(notes, played);
+    // A z B c | A z d d e
+    expect(indices(timeline)).toEqual([0, 1, 2, 3, 0, 1, 4, 5, 6]);
+    expect(timeline.map((e) => e.time)).toEqual([0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]);
+  });
+});
+
+describe('noteIndexAtTime', () => {
+  const timeline = [{ time: 0.25, index: 0 }, { time: 0.5, index: 1 }, { time: 0.75, index: 0 }];
+
+  it('is -1 before the first note starts', () => {
+    expect(noteIndexAtTime(timeline, 0)).toBe(-1);
+    expect(noteIndexAtTime([], 1)).toBe(-1);
+  });
+
+  it('finds the note sounding at a time, boundaries included', () => {
+    expect(noteIndexAtTime(timeline, 0.25)).toBe(0);
+    expect(noteIndexAtTime(timeline, 0.4)).toBe(0);
+    expect(noteIndexAtTime(timeline, 0.5)).toBe(1);
+    expect(noteIndexAtTime(timeline, 0.75)).toBe(0);
+  });
+
+  it('stays on the last note past the end', () => {
+    expect(noteIndexAtTime(timeline, 10)).toBe(0);
   });
 });
 

@@ -44,7 +44,6 @@ const holdProgress = ref(0);
 const advancing = ref(false);
 const finished = ref(false);
 
-const startBar = ref(1);
 const jumpBar = ref(1);
 
 /** True while either continuous Listen or single-note step playback is the
@@ -78,6 +77,18 @@ const currentNote = computed(() => {
   return notes[Math.min(displayIndex.value, notes.length - 1)] ?? null;
 });
 
+/** The note whose fingering the sidebar shows. While playback runs, a rest
+ *  keeps the last sounded note's fingering up rather than blanking it, so
+ *  the diagram doesn't fade out and back in on every rest in the tune. */
+const hintNote = computed(() => {
+  if (!listening.value) return currentNote.value;
+  const notes = parsed.value?.notes ?? [];
+  for (let i = Math.min(displayIndex.value, notes.length - 1); i >= 0; i -= 1) {
+    if (!notes[i].isRest) return notes[i];
+  }
+  return null;
+});
+
 onMounted(async () => {
   const result = await parseAbc(props.song.abc);
   if (playableTargets(result.notes).length === 0) {
@@ -85,6 +96,9 @@ onMounted(async () => {
     return;
   }
   parsed.value = result;
+  // Straight into the session -- the "Practice" click that opened this view
+  // is the go-ahead; the browser's own mic prompt is the only gate left.
+  begin();
 });
 
 /** A wake lock so the phone does not sleep mid-song. Best-effort. */
@@ -97,12 +111,16 @@ function releaseWakeLock() {
   wakeLock = null;
 }
 
+/** Set on unmount, so a mic prompt still open when the player backs out
+ *  doesn't leave the stream (and the browser's recording indicator) on. */
+let disposed = false;
+
 async function begin() {
-  if (!(await mic.start())) return;
+  if (disposed || !(await mic.start())) return;
+  if (disposed) { mic.stop(); return; }
   await acquireWakeLock();
   if (!sequence.value) {
     sequence.value = new SequenceMatcher(playableTargets(parsed.value.notes), settings.matcherConfig);
-    sequence.value.seekTo(playableIndexForBar(parsed.value.notes, startBar.value), performance.now());
   }
   syncFromMatcher();
   detection.start(onFrame);
@@ -211,7 +229,8 @@ function stopListening() {
   if (running.value) detection.start(onFrame);
 }
 
-/** Continuous playback, from wherever the practice cursor currently is. */
+/** Continuous playback, from wherever the practice cursor currently is.
+ *  The staff highlight and fingering follow the note being heard. */
 async function listenFromHere() {
   if (listening.value || !parsed.value) return;
   beginListenMode();
@@ -223,6 +242,7 @@ async function listenFromHere() {
     meter: parsed.value.meter ?? { num: 4, den: 4 },
     fromIndex: stepIndex.value,
     onEnded: stopListening,
+    onNote: (i) => { stepIndex.value = i; },
   });
 }
 
@@ -273,6 +293,7 @@ const feedback = computed(() => {
 });
 
 onUnmounted(() => {
+  disposed = true;
   detection.stop();
   releaseWakeLock();
 });
@@ -301,13 +322,7 @@ onUnmounted(() => {
               Play through the tune one note at a time. The cursor waits for the
               right pitch, held steady, and moves on whenever you're ready.
             </p>
-            <label class="bar-field">
-              Start from measure
-              <input v-model.number="startBar" type="number" min="1" :max="maxBar" />
-            </label>
-            <button class="primary" :disabled="mic.status.value === MIC.REQUESTING" @click="begin">
-              {{ mic.status.value === MIC.REQUESTING ? 'Waiting for microphone…' : 'Start playing' }}
-            </button>
+            <p class="hint">Waiting for microphone…</p>
           </template>
         </div>
 
@@ -351,7 +366,7 @@ onUnmounted(() => {
 
       <template #sidebar>
         <PracticeSidebar
-          :hint-midi="currentNote && !currentNote.isRest && !finished ? currentNote.midi : null"
+          :hint-midi="hintNote && !hintNote.isRest && !finished ? hintNote.midi : null"
           :hint-shown="running && (hintShown || listening)"
           :can-reveal="running && !finished"
           :reveal-disabled="listening"
