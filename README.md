@@ -295,7 +295,9 @@ next load, with no code change.
   melodic line (no chords, extra voices, or quarter-tones), or it's skipped
   with a console warning rather than breaking anyone's library. Paste the
   tune into the app's **Add a song** form first (Song Practice -> Add a
-  song) to see exactly what it objects to, if anything.
+  song) to see exactly what it objects to, if anything. `npm test` also
+  validates every bundled file (`test/bundled-songs.test.js`), so a broken
+  one fails the suite instead of silently going missing.
 - `npm run dev` picks up a new file immediately -- a small Vite plugin
   (`vite-songs-plugin.mjs`) rescans `public/songs/` and regenerates its
   manifest (`public/songs/index.json`, gitignored -- it's generated, never
